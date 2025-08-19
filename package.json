@@ -188,7 +188,6 @@
     "language-tags": "^1.0.9",
     "levn": "^0.4.1",
     "lightningcss": "^1.30.1",
-    "lightningcss-win32-x64-msvc": "^1.30.1",
     "locate-path": "^6.0.0",
     "lodash.merge": "^4.6.2",
     "loose-envify": "^1.4.0",
@@ -309,10 +308,11 @@
     "which-typed-array": "^1.1.19",
     "word-wrap": "^1.2.5",
     "yallist": "^5.0.0",
-    "yocto-queue": "^0.1.0"
+    "yocto-queue": "^0.1.0",
+    "zustand": "^4.5.7"
   },
   "scripts": {
-    "prebuild": "cmd /c \"if exist app\\page.jsx del /f /q app\\page.jsx\"",
+    "prebuild": "rimraf app/page.jsx",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
@@ -324,6 +324,24 @@
     "@types/node": "24.3.0",
     "@types/react": "19.1.10",
     "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6"
-  }
+    "postcss": "^8.5.6",
+    "rimraf": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=18.18 <23"
+  },
+  "okrs": [],
+  "addOKR": "(title) => set((s) => { if (s.okrs.length >= 5) return s; return { okrs: [...s.okrs, { id: uid(), title: title.trim(), activities: [] }] }; })",
+  "deleteOKR": "(id) => set((s) => ({ okrs: s.okrs.filter((o) => o.id !== id) }))",
+  "addOKRActivity": "(okrId, title) => set((s) => { const okrs = s.okrs.map((o) => { if (o.id !== okrId) return o; if (o.activities.length >= 5) return o; return { ...o, activities: [...o.activities, { id: uid(), title: title.trim() }] }; }); return { okrs }; })",
+  "deleteOKRActivity": "(okrId, activityId) => set((s) => { const okrs = s.okrs.map((o) => o.id === okrId ? { ...o, activities: o.activities.filter((a) => a.id !== activityId) } : o ); return { okrs }; })",
+  "setActivityAssignee": "(okrId, activityId, assigneeId) => set((s) => { const okrs = s.okrs.map((o) => { if (o.id !== okrId) return o; return { ...o, activities: o.activities.map((a) => a.id === activityId ? { ...a, assigneeId: assigneeId || undefined } : a ) }; }); return { okrs }; })",
+  "rituals": [],
+  "addRitual": "(title) => set((s) => ({ rituals: [...s.rituals, { id: uid(), title: title.trim(), notes: '' }] }))",
+  "updateRitualNotes": "(ritualId, notes) => set((s) => ({ rituals: s.rituals.map((r) => (r.id === ritualId ? { ...r, notes } : r)) }))",
+  "deleteRitual": "(ritualId) => set((s) => ({ rituals: s.rituals.filter((r) => r.id !== ritualId) }))",
+  "collaborators": [],
+  "addCollaborator": "(c) => set((s) => ({ collaborators: [...s.collaborators, { id: uid(), name: (c.name || '').trim(), role: (c.role || '').trim() || undefined, email: (c.email || '').trim() || undefined }] }))",
+  "updateCollaborator": "(id, patch) => set((s) => ({ collaborators: s.collaborators.map((col) => col.id === id ? { ...col, ...(patch.name !== undefined ? { name: patch.name.trim() } : {}), ...(patch.role !== undefined ? { role: patch.role.trim() || undefined } : {}), ...(patch.email !== undefined ? { email: patch.email.trim() || undefined } : {}) } : col ) }))",
+  "deleteCollaborator": "(id) => set((s) => { const collaborators = s.collaborators.filter((c) => c.id !== id); const okrs = s.okrs.map((o) => ({ ...o, activities: o.activities.map((a) => a.assigneeId === id ? { ...a, assigneeId: undefined } : a ) })); return { collaborators, okrs }; })"
 }
