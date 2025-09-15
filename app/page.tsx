@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useInitializeStore } from '../lib/store';
+import { useAppStore } from '../lib/store';
 
 const Dashboard = dynamic(() => import('./components/Dashboard'), { ssr: false });
 const Board = dynamic(() => import('./components/Board'), { ssr: false });
@@ -13,9 +13,6 @@ const Team = dynamic(() => import('./components/Team'), { ssr: false });
 type Tab = 'dashboard' | 'board' | 'team' | 'okrs' | 'rituais';
 
 export default function Page() {
-  // Inicializa dados do localStorage
-  useInitializeStore();
-  
   const [tab, setTab] = useState<Tab>('dashboard');
 
   const TabBtn = ({ id, label }: { id: Tab; label: string }) => (
