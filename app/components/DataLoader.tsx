@@ -26,14 +26,33 @@ export default function DataLoader({ children }: { children: React.ReactNode }) 
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center text-red-600">
+        <div className="text-center text-red-600 max-w-md mx-auto p-6">
           <p className="mb-4">❌ {error}</p>
-          <button 
-            onClick={loadAllData}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-          >
-            Tentar novamente
-          </button>
+          <div className="text-sm text-gray-600 mb-4">
+            <p>Possíveis causas:</p>
+            <ul className="text-left mt-2 space-y-1">
+              <li>• Credenciais do Supabase incorretas</li>
+              <li>• Tabelas não criadas no banco</li>
+              <li>• Problema de conexão</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <button 
+              onClick={loadAllData}
+              className="block w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            >
+              Tentar novamente
+            </button>
+            <button 
+              onClick={() => {
+                // Fallback para localStorage temporário
+                window.location.reload();
+              }}
+              className="block w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              Recarregar página
+            </button>
+          </div>
         </div>
       </div>
     );

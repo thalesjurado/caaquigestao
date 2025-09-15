@@ -1,5 +1,6 @@
 'use client';
 
+import { useAppStore } from '@/lib/store-fallback';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import DataLoader from './components/DataLoader';

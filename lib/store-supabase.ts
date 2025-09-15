@@ -5,7 +5,8 @@ import {
   boardActivitiesAPI, 
   collaboratorsAPI, 
   okrsAPI, 
-  ritualsAPI,
+  ritualsAPI, 
+  testConnection,
   SupabaseBoardActivity,
   SupabaseCollaborator,
   SupabaseOKR,
@@ -184,12 +185,39 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
+      console.log('🔄 Carregando dados do Supabase...');
+      
+      // Teste de conexão primeiro
+      const connectionOk = await testConnection();
+      if (!connectionOk) {
+        throw new Error('Falha na conexão com Supabase');
+      }
+      
       const [boardActivities, collaborators, okrs, rituals] = await Promise.all([
-        boardActivitiesAPI.getAll(),
-        collaboratorsAPI.getAll(),
-        okrsAPI.getAll(),
-        ritualsAPI.getAll(),
+        boardActivitiesAPI.getAll().catch(err => {
+          console.error('Erro ao carregar boardActivities:', err);
+          return [];
+        }),
+        collaboratorsAPI.getAll().catch(err => {
+          console.error('Erro ao carregar collaborators:', err);
+          return [];
+        }),
+        okrsAPI.getAll().catch(err => {
+          console.error('Erro ao carregar okrs:', err);
+          return [];
+        }),
+        ritualsAPI.getAll().catch(err => {
+          console.error('Erro ao carregar rituals:', err);
+          return [];
+        }),
       ]);
+
+      console.log('✅ Dados carregados:', {
+        boardActivities: boardActivities.length,
+        collaborators: collaborators.length,
+        okrs: okrs.length,
+        rituals: rituals.length
+      });
 
       set({
         boardActivities: boardActivities.map(convertFromSupabase.boardActivity),
@@ -199,8 +227,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      set({ error: 'Erro ao carregar dados', isLoading: false });
+      console.error('❌ Erro geral ao carregar dados:', error);
+      set({ 
+        error: `Erro ao conectar com Supabase: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 
+        isLoading: false 
+      });
     }
   },
 

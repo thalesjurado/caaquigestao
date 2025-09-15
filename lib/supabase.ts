@@ -1,8 +1,39 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Configuração do Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ohanjvrxywgreokkeckd.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key'
+
+// Debug das variáveis de ambiente
+console.log('🔧 Supabase Config:', {
+  url: supabaseUrl,
+  hasKey: !!supabaseAnonKey && supabaseAnonKey !== 'your-anon-key'
+});
+
+// Teste de conexão simples
+export const testConnection = async () => {
+  try {
+    console.log('🔍 Testando conexão com Supabase...');
+    const { data, error } = await supabase.from('board_activities').select('count', { count: 'exact' });
+    
+    if (error) {
+      console.error('❌ Erro na conexão:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        status: (error as any).status || 'N/A'
+      });
+      return false;
+    }
+    
+    console.log('✅ Conexão OK - board_activities:', data);
+    return true;
+  } catch (err) {
+    console.error('❌ Erro de conexão geral:', err);
+    return false;
+  }
+};
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -60,7 +91,15 @@ export const boardActivitiesAPI = {
       .select('*')
       .order('created_at', { ascending: false })
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Erro detalhado boardActivities:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw error;
+    }
     return data || []
   },
 
@@ -112,7 +151,10 @@ export const collaboratorsAPI = {
       .select('*')
       .order('name', { ascending: true })
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Erro detalhado collaborators:', error);
+      throw error;
+    }
     return data || []
   },
 
@@ -164,7 +206,10 @@ export const okrsAPI = {
       .select('*')
       .order('created_at', { ascending: false })
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Erro detalhado okrs:', error);
+      throw error;
+    }
     return data || []
   },
 
@@ -216,7 +261,10 @@ export const ritualsAPI = {
       .select('*')
       .order('created_at', { ascending: false })
     
-    if (error) throw error
+    if (error) {
+      console.error('❌ Erro detalhado rituals:', error);
+      throw error;
+    }
     return data || []
   },
 
