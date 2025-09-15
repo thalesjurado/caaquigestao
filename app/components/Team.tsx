@@ -2,7 +2,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAppStore, Collaborator, OKR } from '../../lib/store';
+import { useAppStore, Collaborator, OKR } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
 
 function useAssigneeCounts(okrs: OKR[]) {

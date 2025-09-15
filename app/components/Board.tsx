@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useAppStore, BoardActivity } from '../../lib/store';
+import { useAppStore, BoardActivity } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
 
 const COLUMNS: { key: BoardActivity['status']; title: string }[] = [

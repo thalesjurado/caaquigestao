@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useAppStore } from '../lib/store';
+import DataLoader from './components/DataLoader';
 
 const Dashboard = dynamic(() => import('./components/Dashboard'), { ssr: false });
 const Projetos = dynamic(() => import('./components/Projetos'), { ssr: false });
@@ -30,19 +30,20 @@ export default function Page() {
   );
 
   return (
-    <main className="max-w-6xl mx-auto p-6 space-y-10">
-      <section className="mb-4">
-        <div className="flex flex-wrap gap-2 md:space-x-2 md:gap-0">
-          <TabBtn id="dashboard" label="Dashboard" />
-          <TabBtn id="projetos" label="Projetos" />
-          <TabBtn id="board" label="Board" />
-          <TabBtn id="okrs" label="OKRs" />
-          <TabBtn id="rituais" label="Rituais" />
-          <TabBtn id="team" label="Equipe" />
-        </div>
-      </section>
+    <DataLoader>
+      <main className="max-w-6xl mx-auto p-6 space-y-10">
+        <section className="mb-4">
+          <div className="flex flex-wrap gap-2 md:space-x-2 md:gap-0">
+            <TabBtn id="dashboard" label="Dashboard" />
+            <TabBtn id="projetos" label="Projetos" />
+            <TabBtn id="board" label="Board" />
+            <TabBtn id="okrs" label="OKRs" />
+            <TabBtn id="rituais" label="Rituais" />
+            <TabBtn id="team" label="Equipe" />
+          </div>
+        </section>
 
-      <section>
+        <section>
         {tab === 'dashboard' && (
           <>
             <h2 className="text-2xl font-bold mb-3">Dashboard</h2>
@@ -84,7 +85,8 @@ export default function Page() {
             <Team />
           </>
         )}
-      </section>
-    </main>
+        </section>
+      </main>
+    </DataLoader>
   );
 }

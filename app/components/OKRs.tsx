@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useAppStore, OKR } from '../../lib/store';
+import { useAppStore, OKR } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
 
 function AssigneeSelect({

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useAppStore } from '../../lib/store';
+import { useAppStore } from '../../lib/store-supabase';
 import {
   ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,

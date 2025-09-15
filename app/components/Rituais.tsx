@@ -1,21 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAppStore, Ritual } from '../../lib/store';
+import { useAppStore, Ritual } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
 
 function RitualItem({ ritual }: { ritual: Ritual }) {
-  const [notes, setNotes] = useState(ritual.notes ?? '');
+  const [notes, setNotes] = useState(ritual.content ?? '');
   const update = useAppStore((s) => s.updateRitual);
   const deleteRitual = useAppStore((s) => s.deleteRitual);
 
   // Sincroniza caso o estado global mude (ex.: hidratação do persist)
   useEffect(() => {
-    setNotes(ritual.notes ?? '');
-  }, [ritual.notes]);
+    setNotes(ritual.content ?? '');
+  }, [ritual.content]);
 
   const save = () => {
-    update(ritual.id, { notes });
+    update(ritual.id, { content: notes });
     toast.success('Notas do ritual salvas');
   };
 
