@@ -12,11 +12,7 @@ export default function ProjectsPage() {
 
   const groups = new Map<string, Activity[]>();
   for (const a of board) {
-    const key =
-      a.project ??
-      a.client ??
-      a.pillar ??
-      'Projeto Único';
+    const key = a.client ?? 'Projeto Único';
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(a);
   }

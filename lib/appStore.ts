@@ -2,79 +2,79 @@
 
 import { useSyncExternalStore } from 'react';
 
-
 // -------------------- Tipos --------------------
-export type BoardStatus = 'backlog' | 'todo' | 'doing' | 'review' | 'done';
-
-export type BoardActivity = {
+export interface BoardActivity {
   id: string;
   title: string;
-  status: BoardStatus;
+  status: 'todo' | 'doing' | 'done';
   assigneeId?: string;
   description?: string;
-
-  // Campos usados pelos componentes
   client?: string;
-  project?: string;
-  pillar?: string;
   points?: number;
-  due?: string; // ISO string
-};
+  createdAt?: Date;
+}
 
-export type Collaborator = {
+export interface Collaborator {
   id: string;
   name: string;
+  email: string;
   role: string;
-  email?: string;
-};
+  avatar?: string;
+}
 
-export type OKR = {
+export interface OKR {
   id: string;
   title: string;
-  activities: BoardActivity[];
-};
+  description: string;
+  progress: number;
+  activities: {
+    id: string;
+    title: string;
+    completed: boolean;
+    assigneeId?: string;
+  }[];
+}
 
-export type Ritual = {
+export interface Ritual {
   id: string;
   title: string;
-  cadence?: string;
-  notes?: string;
-};
+  notes: string;
+  createdAt: Date;
+}
 
-export type AppState = {
-  // Board
+export interface AppState {
   boardActivities: BoardActivity[];
   addBoardActivity: (title: string, extra?: Partial<BoardActivity>) => void;
+  updateBoardActivity: (id: string, patch: Partial<BoardActivity>) => void;
   deleteBoardActivity: (id: string) => void;
-  setBoardStatus: (id: string, status: BoardStatus) => void;
-
-  // Colaboradores
+  
   collaborators: Collaborator[];
-  addCollaborator: (name: string, role?: string, email?: string) => void;
+  addCollaborator: (collaborator: Omit<Collaborator, 'id'>) => void;
   updateCollaborator: (id: string, patch: Partial<Collaborator>) => void;
   deleteCollaborator: (id: string) => void;
-
-  // OKRs
+  
   okrs: OKR[];
-  addOKR: (title: string) => void;
-  deleteOKR: (okrId: string) => void;
-  addOKRActivity: (okrId: string, title: string) => void;
+  addOKR: (okr: Omit<OKR, 'id'>) => void;
+  updateOKR: (id: string, patch: Partial<OKR>) => void;
+  deleteOKR: (id: string) => void;
+  addOKRActivity: (okrId: string, title: string, assigneeId?: string) => void;
+  updateOKRActivity: (okrId: string, activityId: string, patch: Partial<OKR['activities'][0]>) => void;
   deleteOKRActivity: (okrId: string, activityId: string) => void;
-  setActivityAssignee: (okrId: string, activityId: string, collaboratorId: string | undefined) => void;
-
-  // Rituais
+  
   rituals: Ritual[];
   addRitual: (title: string) => void;
   updateRitual: (id: string, patch: Partial<Ritual>) => void;
   deleteRitual: (id: string) => void;
-};
+}
 
 // -------------------- Estado & utils --------------------
 const listeners = new Set<() => void>();
+let isInitialized = false;
+
 function emit() { 
   listeners.forEach(l => l()); 
-  // Salva no localStorage após cada mudança (sem causar re-render)
-  if (typeof window !== 'undefined') {
+  // Salva no localStorage após cada mudança (apenas se já inicializado)
+  if (typeof window !== 'undefined' && isInitialized) {
     try {
       localStorage.setItem('caaqui-projectops-data', JSON.stringify({
         boardActivities: state.boardActivities,
@@ -87,7 +87,12 @@ function emit() {
     }
   }
 }
-function subscribe(l: () => void) { listeners.add(l); return () => listeners.delete(l); }
+
+function subscribe(l: () => void) { 
+  listeners.add(l); 
+  return () => listeners.delete(l); 
+}
+
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 // Função para carregar dados do localStorage
@@ -106,9 +111,8 @@ function loadFromStorage(): Partial<AppState> {
 }
 
 // -------------------- Estado inicial --------------------
-let savedData: Partial<AppState> = {};
 let state: AppState = {
-  boardActivities: savedData.boardActivities || [],
+  boardActivities: [],
   addBoardActivity(title, extra) {
     const a: BoardActivity = {
       id: uid(),
@@ -117,31 +121,35 @@ let state: AppState = {
       assigneeId: extra?.assigneeId,
       description: extra?.description,
       client: extra?.client,
-      project: extra?.project,
-      pillar: extra?.pillar,
-      points: typeof extra?.points === 'number' ? extra.points : undefined,
-      due: extra?.due,
+      points: extra?.points,
+      createdAt: extra?.createdAt ?? new Date(),
     };
     state = { ...state, boardActivities: [...state.boardActivities, a] };
     emit();
   },
-  deleteBoardActivity(id) {
-    state = { ...state, boardActivities: state.boardActivities.filter(x => x.id !== id) };
+  updateBoardActivity(id, patch) {
+    state = {
+      ...state,
+      boardActivities: state.boardActivities.map(a => a.id === id ? { ...a, ...patch } : a)
+    };
     emit();
   },
-  setBoardStatus(id, status) {
-    state = { ...state, boardActivities: state.boardActivities.map(x => x.id === id ? { ...x, status } : x) };
+  deleteBoardActivity(id) {
+    state = { ...state, boardActivities: state.boardActivities.filter(a => a.id !== id) };
     emit();
   },
 
-  collaborators: savedData.collaborators || [],
-  addCollaborator(name, role, email) {
-    const c: Collaborator = { id: uid(), name, role: role ?? 'Sem função', email };
+  collaborators: [],
+  addCollaborator(collaborator) {
+    const c: Collaborator = { ...collaborator, id: uid() };
     state = { ...state, collaborators: [...state.collaborators, c] };
     emit();
   },
   updateCollaborator(id, patch) {
-    state = { ...state, collaborators: state.collaborators.map(c => c.id === id ? { ...c, ...patch } : c) };
+    state = {
+      ...state,
+      collaborators: state.collaborators.map(c => c.id === id ? { ...c, ...patch } : c)
+    };
     emit();
   },
   deleteCollaborator(id) {
@@ -149,56 +157,55 @@ let state: AppState = {
     emit();
   },
 
-  okrs: savedData.okrs || [],
-  addOKR(title) {
-    const okr: OKR = { id: uid(), title, activities: [] };
-    state = { ...state, okrs: [...state.okrs, okr] };
+  okrs: [],
+  addOKR(okr) {
+    const o: OKR = { ...okr, id: uid() };
+    state = { ...state, okrs: [...state.okrs, o] };
     emit();
   },
-  deleteOKR(okrId) {
-    state = { ...state, okrs: state.okrs.filter(o => o.id !== okrId) };
+  updateOKR(id, patch) {
+    state = { ...state, okrs: state.okrs.map(o => o.id === id ? { ...o, ...patch } : o) };
     emit();
   },
-  addOKRActivity(okrId, title) {
-    const a: BoardActivity = { id: uid(), title, status: 'todo' };
+  deleteOKR(id) {
+    state = { ...state, okrs: state.okrs.filter(o => o.id !== id) };
+    emit();
+  },
+  addOKRActivity(okrId, title, assigneeId) {
+    const activity = { id: uid(), title, completed: false, assigneeId };
     state = {
       ...state,
-      okrs: state.okrs.map(o => o.id === okrId ? { ...o, activities: [...o.activities, a] } : o),
+      okrs: state.okrs.map(o => 
+        o.id === okrId ? { ...o, activities: [...o.activities, activity] } : o
+      )
+    };
+    emit();
+  },
+  updateOKRActivity(okrId, activityId, patch) {
+    state = {
+      ...state,
+      okrs: state.okrs.map(o => 
+        o.id === okrId ? {
+          ...o,
+          activities: o.activities.map(a => a.id === activityId ? { ...a, ...patch } : a)
+        } : o
+      )
     };
     emit();
   },
   deleteOKRActivity(okrId, activityId) {
     state = {
       ...state,
-      okrs: state.okrs.map(o => o.id === okrId ? { ...o, activities: o.activities.filter(a => a.id !== activityId) } : o),
+      okrs: state.okrs.map(o => 
+        o.id === okrId ? { ...o, activities: o.activities.filter(a => a.id !== activityId) } : o
+      )
     };
     emit();
   },
-  setActivityAssignee(okrId, activityId, collaboratorId) {
-    const collId = collaboratorId ?? undefined;
 
-    // Atualiza no board (se a atividade também estiver lá)
-    const board = state.boardActivities.map(a =>
-      a.id === activityId ? { ...a, assigneeId: collId } : a
-    );
-
-    // Atualiza dentro do OKR específico
-    const okrs = state.okrs.map(o =>
-      o.id === okrId
-        ? { ...o, activities: o.activities.map(a =>
-            a.id === activityId ? { ...a, assigneeId: collId } : a
-          )
-          }
-        : o
-    );
-
-    state = { ...state, boardActivities: board, okrs };
-    emit();
-  },
-
-  rituals: savedData.rituals || [],
+  rituals: [],
   addRitual(title) {
-    const r: Ritual = { id: uid(), title, cadence: undefined, notes: '' };
+    const r: Ritual = { id: uid(), title, notes: '', createdAt: new Date() };
     state = { ...state, rituals: [...state.rituals, r] };
     emit();
   },
@@ -212,24 +219,23 @@ let state: AppState = {
   },
 };
 
+// Inicializa o estado uma única vez no cliente
+if (typeof window !== 'undefined' && !isInitialized) {
+  const savedData = loadFromStorage();
+  state = {
+    ...state,
+    boardActivities: savedData.boardActivities || [],
+    collaborators: savedData.collaborators || [],
+    okrs: savedData.okrs || [],
+    rituals: savedData.rituals || []
+  };
+  isInitialized = true;
+}
+
 // -------------------- Hook --------------------
 export function useAppStore<T>(selector: (s: AppState) => T): T {
-  // Inicializa dados do localStorage apenas no cliente
-  if (typeof window !== 'undefined' && Object.keys(savedData).length === 0) {
-    savedData = loadFromStorage();
-    // Atualiza o estado com os dados carregados
-    state = {
-      ...state,
-      boardActivities: savedData.boardActivities || [],
-      collaborators: savedData.collaborators || [],
-      okrs: savedData.okrs || [],
-      rituals: savedData.rituals || []
-    };
-  }
-  
   return useSyncExternalStore(subscribe, () => selector(state), () => selector(state));
 }
+
 export function getState(): AppState { return state; }
 export {};
-
-

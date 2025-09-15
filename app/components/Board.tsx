@@ -1,13 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { useAppStore, BoardStatus } from '../../lib/store';
+import { useAppStore, BoardActivity } from '../../lib/store';
 import { toast } from '../../lib/toast';
 
-const COLUMNS: { key: BoardStatus; title: string }[] = [
-  { key: 'backlog', title: 'Backlog' },
+const COLUMNS: { key: BoardActivity['status']; title: string }[] = [
   { key: 'todo', title: 'A Fazer' },
   { key: 'doing', title: 'Em Progresso' },
-  { key: 'review', title: 'Em Revisão' },
   { key: 'done', title: 'Concluído' },
 ];
 
@@ -22,7 +20,7 @@ function fmtDate(iso?: string) {
 
 export default function Board() {
   const activities = useAppStore((s) => s.boardActivities);
-  const setStatus = useAppStore((s) => s.setBoardStatus);
+  const updateActivity = useAppStore((s) => s.updateBoardActivity);
   const add = useAppStore((s) => s.addBoardActivity);
   const del = useAppStore((s) => s.deleteBoardActivity);
   const collaborators = useAppStore((s) => s.collaborators);
@@ -32,10 +30,7 @@ export default function Board() {
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState<number | ''>('');
   const [assigneeId, setAssigneeId] = useState<string>('');
-  const [pillar, setPillar] = useState('');
   const [client, setClient] = useState('');
-  const [project, setProject] = useState('');
-  const [due, setDue] = useState('');
 
   const canAdd = title.trim().length > 0;
 
@@ -45,19 +40,13 @@ export default function Board() {
       status: 'todo',
       points: typeof points === 'number' ? points : undefined,
       assigneeId: assigneeId || undefined,
-      pillar: pillar || undefined,
       client: client || undefined,
-      project: project || undefined,
-      due: due || undefined,
     });
     toast.success('Tarefa adicionada com sucesso!');
     setTitle('');
     setPoints('');
     setAssigneeId('');
-    setPillar('');
     setClient('');
-    setProject('');
-    setDue('');
     setOpenNew(false);
   };
 
@@ -68,20 +57,17 @@ export default function Board() {
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
-  const onDrop = (e: React.DragEvent, dest: BoardStatus) => {
+  const onDrop = (e: React.DragEvent, status: BoardActivity['status']) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('text/plain');
-    if (!id) return;
-    setStatus(id, dest);
-    toast.success(`Tarefa movida para ${COLUMNS.find(c => c.key === dest)?.title}`);
+    updateActivity(id, { status });
+    toast.success(`Tarefa movida para ${COLUMNS.find(c => c.key === status)?.title}`);
   };
 
   const byCol = useMemo(() => {
-    const map: Record<BoardStatus, typeof activities> = {
-      backlog: [],
+    const map: Record<BoardActivity['status'], typeof activities> = {
       todo: [],
       doing: [],
-      review: [],
       done: [],
     };
     for (const a of activities) map[a.status].push(a);
@@ -117,18 +103,6 @@ export default function Board() {
               value={client}
               onChange={(e) => setClient(e.target.value)}
             />
-            <input
-              className="border rounded-xl p-2"
-              placeholder="Projeto"
-              value={project}
-              onChange={(e) => setProject(e.target.value)}
-            />
-            <input
-              className="border rounded-xl p-2"
-              placeholder="Pilar (ex.: CRM, CSM, Tech...)"
-              value={pillar}
-              onChange={(e) => setPillar(e.target.value)}
-            />
             <div className="flex gap-3">
               <input
                 className="w-24 border rounded-xl p-2"
@@ -137,12 +111,6 @@ export default function Board() {
                 placeholder="pts"
                 value={points}
                 onChange={(e) => setPoints(e.target.value === '' ? '' : Number(e.target.value))}
-              />
-              <input
-                className="border rounded-xl p-2"
-                type="date"
-                value={due}
-                onChange={(e) => setDue(e.target.value)}
               />
             </div>
             <select
@@ -201,26 +169,16 @@ export default function Board() {
                       <div className="font-medium leading-snug">
                         {a.title}
                       </div>
-                      {(a.client || a.project) && (
+                      {a.client && (
                         <div className="text-xs text-gray-600 mt-1">
-                          {a.client && <span>{a.client}</span>}
-                          {a.client && a.project && <span> • </span>}
-                          {a.project && <span>{a.project}</span>}
+                          <span>{a.client}</span>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
-                        {a.pillar && (
-                          <span className="px-2 py-1 rounded-full bg-gray-100">{a.pillar}</span>
-                        )}
                         {owner && <span>{owner.name}</span>}
                         {typeof a.points === 'number' && (
                           <span className="px-2 py-1 rounded-full bg-gray-100">
                             {a.points} pts
-                          </span>
-                        )}
-                        {a.due && (
-                          <span className="px-2 py-1 rounded-full bg-gray-100">
-                            {fmtDate(a.due)}
                           </span>
                         )}
                         <button

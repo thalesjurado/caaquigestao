@@ -123,7 +123,7 @@ export default function Team() {
 
   const handleAdd = () => {
     if (!canAdd) return;
-    add(name.trim(), role.trim() || undefined, email.trim() || undefined);
+    add({ name: name.trim(), role: role.trim() || 'Membro', email: email.trim() || '' });
     toast.success('Colaborador adicionado');
     setName('');
     setRole('');

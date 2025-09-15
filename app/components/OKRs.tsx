@@ -32,7 +32,7 @@ function OKRCard({ okr }: { okr: OKR }) {
   const [task, setTask] = useState('');
   const addOKRActivity = useAppStore((s) => s.addOKRActivity);
   const deleteOKRActivity = useAppStore((s) => s.deleteOKRActivity);
-  const setActivityAssignee = useAppStore((s) => s.setActivityAssignee);
+  const updateOKRActivity = useAppStore((s) => s.updateOKRActivity);
   const deleteOKR = useAppStore((s) => s.deleteOKR);
 
   const canAdd = okr.activities.length < 5 && task.trim().length > 0;
@@ -59,7 +59,7 @@ function OKRCard({ okr }: { okr: OKR }) {
             <span className="flex-1">{a.title}</span>
             <AssigneeSelect
               value={a.assigneeId}
-              onChange={(id) => setActivityAssignee(okr.id, a.id, id)}
+              onChange={(assigneeId) => updateOKRActivity(okr.id, a.id, { assigneeId })}
             />
             <button
               className="text-red-500 text-sm hover:underline"
@@ -133,7 +133,12 @@ export default function OKRs() {
           className="bg-black text-white rounded px-3 py-1 text-sm disabled:opacity-50"
           disabled={!canAdd}
           onClick={() => {
-            addOKR(title);
+            addOKR({
+              title: title.trim(),
+              description: '',
+              progress: 0,
+              activities: []
+            });
             toast.success('OKR criado com sucesso');
             setTitle('');
           }}
