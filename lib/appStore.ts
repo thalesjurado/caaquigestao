@@ -73,14 +73,18 @@ export type AppState = {
 const listeners = new Set<() => void>();
 function emit() { 
   listeners.forEach(l => l()); 
-  // Salva no localStorage após cada mudança
+  // Salva no localStorage após cada mudança (sem causar re-render)
   if (typeof window !== 'undefined') {
-    localStorage.setItem('caaqui-projectops-data', JSON.stringify({
-      boardActivities: state.boardActivities,
-      collaborators: state.collaborators,
-      okrs: state.okrs,
-      rituals: state.rituals
-    }));
+    try {
+      localStorage.setItem('caaqui-projectops-data', JSON.stringify({
+        boardActivities: state.boardActivities,
+        collaborators: state.collaborators,
+        okrs: state.okrs,
+        rituals: state.rituals
+      }));
+    } catch (error) {
+      console.warn('Erro ao salvar no localStorage:', error);
+    }
   }
 }
 function subscribe(l: () => void) { listeners.add(l); return () => listeners.delete(l); }
@@ -102,7 +106,7 @@ function loadFromStorage(): Partial<AppState> {
 }
 
 // -------------------- Estado inicial --------------------
-const savedData = loadFromStorage();
+let savedData: Partial<AppState> = {};
 let state: AppState = {
   boardActivities: savedData.boardActivities || [],
   addBoardActivity(title, extra) {
@@ -210,6 +214,19 @@ let state: AppState = {
 
 // -------------------- Hook --------------------
 export function useAppStore<T>(selector: (s: AppState) => T): T {
+  // Inicializa dados do localStorage apenas no cliente
+  if (typeof window !== 'undefined' && Object.keys(savedData).length === 0) {
+    savedData = loadFromStorage();
+    // Atualiza o estado com os dados carregados
+    state = {
+      ...state,
+      boardActivities: savedData.boardActivities || [],
+      collaborators: savedData.collaborators || [],
+      okrs: savedData.okrs || [],
+      rituals: savedData.rituals || []
+    };
+  }
+  
   return useSyncExternalStore(subscribe, () => selector(state), () => selector(state));
 }
 export function getState(): AppState { return state; }
