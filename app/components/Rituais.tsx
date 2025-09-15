@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAppStore, Ritual } from '../../lib/store';
+import { toast } from '../../lib/toast';
 
 function RitualItem({ ritual }: { ritual: Ritual }) {
   const [notes, setNotes] = useState(ritual.notes ?? '');
@@ -15,6 +16,7 @@ function RitualItem({ ritual }: { ritual: Ritual }) {
 
   const save = () => {
     update(ritual.id, { notes });
+    toast.success('Notas do ritual salvas');
   };
 
   return (
@@ -23,7 +25,10 @@ function RitualItem({ ritual }: { ritual: Ritual }) {
         <h3 className="font-semibold">{ritual.title}</h3>
         <button
           className="text-red-600 text-sm hover:underline"
-          onClick={() => deleteRitual(ritual.id)}
+          onClick={() => {
+            deleteRitual(ritual.id);
+            toast.success('Ritual excluído');
+          }}
           title="Excluir ritual"
         >
           Excluir
@@ -59,6 +64,7 @@ export default function Rituais() {
   const onAdd = () => {
     if (!title.trim()) return;
     addRitual(title);
+    toast.success('Ritual adicionado');
     setTitle('');
   };
 

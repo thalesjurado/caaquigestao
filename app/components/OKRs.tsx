@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useAppStore, OKR } from '../../lib/store';
+import { toast } from '../../lib/toast';
 
 function AssigneeSelect({
   value,
@@ -42,7 +43,10 @@ function OKRCard({ okr }: { okr: OKR }) {
         <h3 className="font-semibold">{okr.title}</h3>
         <button
           className="text-red-600 text-sm hover:underline"
-          onClick={() => deleteOKR(okr.id)}
+          onClick={() => {
+            deleteOKR(okr.id);
+            toast.success('OKR excluído');
+          }}
           title="Excluir OKR"
         >
           Excluir
@@ -59,7 +63,10 @@ function OKRCard({ okr }: { okr: OKR }) {
             />
             <button
               className="text-red-500 text-sm hover:underline"
-              onClick={() => deleteOKRActivity(okr.id, a.id)}
+              onClick={() => {
+                deleteOKRActivity(okr.id, a.id);
+                toast.success('Atividade removida');
+              }}
               title="Excluir atividade"
             >
               Remover
@@ -83,6 +90,7 @@ function OKRCard({ okr }: { okr: OKR }) {
           disabled={!canAdd}
           onClick={() => {
             addOKRActivity(okr.id, task);
+            toast.success('Atividade adicionada ao OKR');
             setTask('');
           }}
         >
@@ -126,6 +134,7 @@ export default function OKRs() {
           disabled={!canAdd}
           onClick={() => {
             addOKR(title);
+            toast.success('OKR criado com sucesso');
             setTitle('');
           }}
         >

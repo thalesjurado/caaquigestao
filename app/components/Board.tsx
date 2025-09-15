@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useAppStore, BoardStatus } from '../../lib/store';
+import { toast } from '../../lib/toast';
 
 const COLUMNS: { key: BoardStatus; title: string }[] = [
   { key: 'backlog', title: 'Backlog' },
@@ -49,6 +50,7 @@ export default function Board() {
       project: project || undefined,
       due: due || undefined,
     });
+    toast.success('Tarefa adicionada com sucesso!');
     setTitle('');
     setPoints('');
     setAssigneeId('');
@@ -71,6 +73,7 @@ export default function Board() {
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
     setStatus(id, dest);
+    toast.success(`Tarefa movida para ${COLUMNS.find(c => c.key === dest)?.title}`);
   };
 
   const byCol = useMemo(() => {
@@ -223,7 +226,10 @@ export default function Board() {
                         <button
                           className="ml-1 px-2 py-1 rounded-lg border text-gray-600 hover:bg-gray-50"
                           title="Remover"
-                          onClick={() => del(a.id)}
+                          onClick={() => {
+                            del(a.id);
+                            toast.success('Tarefa removida');
+                          }}
                         >
                           🗑
                         </button>

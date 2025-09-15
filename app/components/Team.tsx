@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import { useAppStore, Collaborator, OKR } from '../../lib/store';
+import { toast } from '../../lib/toast';
 
 function useAssigneeCounts(okrs: OKR[]) {
   return useMemo(() => {
@@ -27,6 +28,7 @@ function Row({ c, count }: { c: Collaborator; count: number }) {
   const save = () => {
     if (!name.trim()) return;
     update(c.id, { name, role, email });
+    toast.success('Colaborador atualizado');
     setEdit(false);
   };
 
@@ -37,6 +39,7 @@ function Row({ c, count }: { c: Collaborator; count: number }) {
         : `Remover ${c.name}?`;
     if (window.confirm(msg)) {
       del(c.id);
+      toast.success('Colaborador removido');
     }
   };
 
@@ -121,6 +124,7 @@ export default function Team() {
   const handleAdd = () => {
     if (!canAdd) return;
     add(name.trim(), role.trim() || undefined, email.trim() || undefined);
+    toast.success('Colaborador adicionado');
     setName('');
     setRole('');
     setEmail('');
