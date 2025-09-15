@@ -27,11 +27,28 @@ export default function Dashboard() {
 
   const doneCount = boardActivities.filter(a => a.status === 'done').length;
   const totalBoard = boardActivities.length;
-  const activeProjects = okrs.length;
+
+  // Projetos ativos = número de clientes únicos com tarefas
+  const activeProjects = useMemo(() => {
+    const clients = new Set();
+    boardActivities.forEach(activity => {
+      if (activity.client && activity.client.trim()) {
+        clients.add(activity.client.trim());
+      }
+    });
+    return clients.size;
+  }, [boardActivities]);
+
+  // No prazo = % de tarefas não atrasadas (usando status como proxy)
+  const onTimePct = useMemo(() => {
+    if (totalBoard === 0) return 100;
+    const onTimeCount = boardActivities.filter(a => a.status !== 'todo' || !a.createdAt).length;
+    return Math.round((onTimeCount / totalBoard) * 100);
+  }, [boardActivities, totalBoard]);
+
   const riskPct = Math.round(
     (okrs.filter(o => (o.activities?.length ?? 0) === 0).length / Math.max(1, okrs.length)) * 100
   );
-  const onTimePct = 70; // placeholder
 
   const velocity = useMemo(() => ([
     { name: 'Sem-4', pts: 10 },

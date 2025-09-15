@@ -5,12 +5,13 @@ import dynamic from 'next/dynamic';
 import { useAppStore } from '../lib/store';
 
 const Dashboard = dynamic(() => import('./components/Dashboard'), { ssr: false });
+const Projetos = dynamic(() => import('./components/Projetos'), { ssr: false });
 const Board = dynamic(() => import('./components/Board'), { ssr: false });
 const OKRs = dynamic(() => import('./components/OKRs'), { ssr: false });
 const Rituais = dynamic(() => import('./components/Rituais'), { ssr: false });
 const Team = dynamic(() => import('./components/Team'), { ssr: false });
 
-type Tab = 'dashboard' | 'board' | 'team' | 'okrs' | 'rituais';
+type Tab = 'dashboard' | 'projetos' | 'board' | 'team' | 'okrs' | 'rituais';
 
 export default function Page() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -33,6 +34,7 @@ export default function Page() {
       <section className="mb-4">
         <div className="flex flex-wrap gap-2 md:space-x-2 md:gap-0">
           <TabBtn id="dashboard" label="Dashboard" />
+          <TabBtn id="projetos" label="Projetos" />
           <TabBtn id="board" label="Board" />
           <TabBtn id="okrs" label="OKRs" />
           <TabBtn id="rituais" label="Rituais" />
@@ -45,6 +47,13 @@ export default function Page() {
           <>
             <h2 className="text-2xl font-bold mb-3">Dashboard</h2>
             <Dashboard />
+          </>
+        )}
+
+        {tab === 'projetos' && (
+          <>
+            <h2 className="text-2xl font-bold mb-3">Projetos</h2>
+            <Projetos />
           </>
         )}
 

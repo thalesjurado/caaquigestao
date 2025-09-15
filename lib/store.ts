@@ -13,6 +13,7 @@ export interface BoardActivity {
   client?: string;
   points?: number;
   createdAt?: Date;
+  subtasks?: string[];
 }
 
 export interface Collaborator {
@@ -97,6 +98,7 @@ export const useAppStore = create<AppState & AppActions>()(
           client: extra?.client,
           points: extra?.points,
           createdAt: extra?.createdAt ?? new Date(),
+          subtasks: extra?.subtasks,
         };
         set((state) => ({
           boardActivities: [...state.boardActivities, activity]
