@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore, useEffect } from 'react';
 
 // -------------------- Tipos --------------------
 export interface BoardActivity {
@@ -65,6 +65,9 @@ export interface AppState {
   addRitual: (title: string) => void;
   updateRitual: (id: string, patch: Partial<Ritual>) => void;
   deleteRitual: (id: string) => void;
+  
+  // Função para inicializar dados
+  initializeFromStorage: () => void;
 }
 
 // -------------------- Estado & utils --------------------
@@ -73,7 +76,9 @@ let isInitialized = false;
 
 function emit() { 
   listeners.forEach(l => l()); 
-  // Salva no localStorage após cada mudança (apenas se já inicializado)
+}
+
+function saveToStorage() {
   if (typeof window !== 'undefined' && isInitialized) {
     try {
       localStorage.setItem('caaqui-projectops-data', JSON.stringify({
@@ -95,21 +100,6 @@ function subscribe(l: () => void) {
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-// Função para carregar dados do localStorage
-function loadFromStorage(): Partial<AppState> {
-  if (typeof window === 'undefined') return {};
-  
-  try {
-    const stored = localStorage.getItem('caaqui-projectops-data');
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (error) {
-    console.warn('Erro ao carregar dados do localStorage:', error);
-  }
-  return {};
-}
-
 // -------------------- Estado inicial --------------------
 let state: AppState = {
   boardActivities: [],
@@ -126,6 +116,7 @@ let state: AppState = {
     };
     state = { ...state, boardActivities: [...state.boardActivities, a] };
     emit();
+    saveToStorage();
   },
   updateBoardActivity(id, patch) {
     state = {
@@ -133,10 +124,12 @@ let state: AppState = {
       boardActivities: state.boardActivities.map(a => a.id === id ? { ...a, ...patch } : a)
     };
     emit();
+    saveToStorage();
   },
   deleteBoardActivity(id) {
     state = { ...state, boardActivities: state.boardActivities.filter(a => a.id !== id) };
     emit();
+    saveToStorage();
   },
 
   collaborators: [],
@@ -144,6 +137,7 @@ let state: AppState = {
     const c: Collaborator = { ...collaborator, id: uid() };
     state = { ...state, collaborators: [...state.collaborators, c] };
     emit();
+    saveToStorage();
   },
   updateCollaborator(id, patch) {
     state = {
@@ -151,10 +145,12 @@ let state: AppState = {
       collaborators: state.collaborators.map(c => c.id === id ? { ...c, ...patch } : c)
     };
     emit();
+    saveToStorage();
   },
   deleteCollaborator(id) {
     state = { ...state, collaborators: state.collaborators.filter(c => c.id !== id) };
     emit();
+    saveToStorage();
   },
 
   okrs: [],
@@ -162,14 +158,17 @@ let state: AppState = {
     const o: OKR = { ...okr, id: uid() };
     state = { ...state, okrs: [...state.okrs, o] };
     emit();
+    saveToStorage();
   },
   updateOKR(id, patch) {
     state = { ...state, okrs: state.okrs.map(o => o.id === id ? { ...o, ...patch } : o) };
     emit();
+    saveToStorage();
   },
   deleteOKR(id) {
     state = { ...state, okrs: state.okrs.filter(o => o.id !== id) };
     emit();
+    saveToStorage();
   },
   addOKRActivity(okrId, title, assigneeId) {
     const activity = { id: uid(), title, completed: false, assigneeId };
@@ -180,6 +179,7 @@ let state: AppState = {
       )
     };
     emit();
+    saveToStorage();
   },
   updateOKRActivity(okrId, activityId, patch) {
     state = {
@@ -192,6 +192,7 @@ let state: AppState = {
       )
     };
     emit();
+    saveToStorage();
   },
   deleteOKRActivity(okrId, activityId) {
     state = {
@@ -201,6 +202,7 @@ let state: AppState = {
       )
     };
     emit();
+    saveToStorage();
   },
 
   rituals: [],
@@ -208,33 +210,53 @@ let state: AppState = {
     const r: Ritual = { id: uid(), title, notes: '', createdAt: new Date() };
     state = { ...state, rituals: [...state.rituals, r] };
     emit();
+    saveToStorage();
   },
   updateRitual(id, patch) {
     state = { ...state, rituals: state.rituals.map(r => r.id === id ? { ...r, ...patch } : r) };
     emit();
+    saveToStorage();
   },
   deleteRitual(id) {
     state = { ...state, rituals: state.rituals.filter(r => r.id !== id) };
     emit();
+    saveToStorage();
   },
-};
 
-// Inicializa o estado uma única vez no cliente
-if (typeof window !== 'undefined' && !isInitialized) {
-  const savedData = loadFromStorage();
-  state = {
-    ...state,
-    boardActivities: savedData.boardActivities || [],
-    collaborators: savedData.collaborators || [],
-    okrs: savedData.okrs || [],
-    rituals: savedData.rituals || []
-  };
-  isInitialized = true;
-}
+  initializeFromStorage() {
+    if (typeof window !== 'undefined' && !isInitialized) {
+      try {
+        const stored = localStorage.getItem('caaqui-projectops-data');
+        if (stored) {
+          const savedData = JSON.parse(stored);
+          state = {
+            ...state,
+            boardActivities: savedData.boardActivities || [],
+            collaborators: savedData.collaborators || [],
+            okrs: savedData.okrs || [],
+            rituals: savedData.rituals || []
+          };
+        }
+        isInitialized = true;
+        emit();
+      } catch (error) {
+        console.warn('Erro ao carregar dados do localStorage:', error);
+        isInitialized = true;
+      }
+    }
+  }
+};
 
 // -------------------- Hook --------------------
 export function useAppStore<T>(selector: (s: AppState) => T): T {
   return useSyncExternalStore(subscribe, () => selector(state), () => selector(state));
+}
+
+// Hook para inicializar dados
+export function useInitializeStore() {
+  useEffect(() => {
+    state.initializeFromStorage();
+  }, []);
 }
 
 export function getState(): AppState { return state; }
