@@ -24,8 +24,8 @@ export default function Projetos() {
       .map(([client, tasks]) => ({
         client,
         tasks: tasks.sort((a, b) => {
-          const statusOrder = { 'todo': 0, 'doing': 1, 'done': 2 };
-          return statusOrder[a.status] - statusOrder[b.status];
+          const statusOrder: Record<string, number> = { 'backlog': -1, 'todo': 0, 'doing': 1, 'done': 2, 'historical': 3 };
+          return (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
         })
       }));
   }, [boardActivities]);

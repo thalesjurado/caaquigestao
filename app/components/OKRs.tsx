@@ -137,7 +137,8 @@ export default function OKRs() {
               title: title.trim(),
               description: '',
               progress: 0,
-              activities: []
+              quarter: 'Q1 2025',
+              activities: [],
             });
             toast.success('OKR criado com sucesso');
             setTitle('');

@@ -259,18 +259,8 @@ const useLocalStore = create<AppState & AppActions>()(
   )
 );
 
-// Hook inteligente que tenta Supabase primeiro, fallback para localStorage
-export const useAppStore = (selector: any) => {
-  const supabaseError = useSupabaseStore(s => s.error);
-  
-  // Se Supabase tem erro, usa localStorage
-  if (supabaseError) {
-    return useLocalStore(selector);
-  }
-  
-  // Senão, usa Supabase
-  return useSupabaseStore(selector);
-};
+// Hook que usa localStorage como fallback
+export const useAppStore = useLocalStore;
 
 export function getState() { 
   return useSupabaseStore.getState(); 

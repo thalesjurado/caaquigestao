@@ -1,16 +1,32 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../../lib/store-supabase';
 
 export default function DataLoader({ children }: { children: React.ReactNode }) {
   const loadAllData = useAppStore(s => s.loadAllData);
   const isLoading = useAppStore(s => s.isLoading);
   const error = useAppStore(s => s.error);
+  const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
+    const loadData = async () => {
+      try {
+        await loadAllData();
+        
+        // Se houver erro relacionado a projects/project_allocations, usa fallback
+        if (error && (error.includes('projects') || error.includes('project_allocations'))) {
+          console.log(' Usando sistema de fallback para projects e project_allocations');
+          setShowFallback(true);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        setShowFallback(true);
+      }
+    };
+
+    loadData();
+  }, [loadAllData, error]);
 
   if (isLoading) {
     return (

@@ -6,8 +6,8 @@ import { useAppStore } from '../../lib/store';
 
 export default function ProjectsPage() {
   const okrs = useAppStore(s => s.okrs ?? []);
-  const board = useAppStore(s => s.boardActivities ?? []);
-  const collaborators = useAppStore(s => s.collaborators ?? []);
+  const { boardActivities, collaborators } = useAppStore();
+  const board = boardActivities ?? [];
   type Activity = typeof board[number];
 
   const groups = new Map<string, Activity[]>();

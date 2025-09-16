@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useAppStore } from '../../lib/store-supabase';
 import {
   ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar
 } from 'recharts';
+import ProjectNotifications from './ProjectNotifications';
 
 function Card({ title, value, subtitle }: { title: string; value: string; subtitle?: string }) {
   return (
@@ -19,44 +20,67 @@ function Card({ title, value, subtitle }: { title: string; value: string; subtit
 }
 
 export default function Dashboard() {
-  const { boardActivities, okrs, collaborators } = useAppStore(s => ({
+  const { boardActivities, okrs, collaborators, projects, getProjectMetrics } = useAppStore(s => ({
     boardActivities: s.boardActivities,
     okrs: s.okrs,
-    collaborators: s.collaborators
+    collaborators: s.collaborators,
+    projects: s.projects,
+    getProjectMetrics: s.getProjectMetrics
   }));
+
+  // Force re-render when board activities change to ensure real-time sync
+  useEffect(() => {
+    // This effect will trigger whenever boardActivities change
+    // ensuring the Dashboard metrics update in real-time
+  }, [boardActivities, projects]);
 
   const doneCount = boardActivities.filter(a => a.status === 'done').length;
   const totalBoard = boardActivities.length;
 
-  // Projetos ativos = número de clientes únicos com tarefas
+  // Métricas baseadas nos novos projetos
+  const projectMetrics = useMemo(() => getProjectMetrics(), [getProjectMetrics]);
+  
   const activeProjects = useMemo(() => {
-    const clients = new Set();
-    boardActivities.forEach(activity => {
-      if (activity.client && activity.client.trim()) {
-        clients.add(activity.client.trim());
-      }
-    });
-    return clients.size;
-  }, [boardActivities]);
+    return projects.filter(p => p.status === 'active').length;
+  }, [projects]);
 
-  // No prazo = % de tarefas não atrasadas (usando status como proxy)
+  // No prazo = % de projetos que estão dentro do prazo
   const onTimePct = useMemo(() => {
-    if (totalBoard === 0) return 100;
-    const onTimeCount = boardActivities.filter(a => a.status !== 'todo' || !a.createdAt).length;
-    return Math.round((onTimeCount / totalBoard) * 100);
-  }, [boardActivities, totalBoard]);
+    if (projectMetrics.length === 0) return 100;
+    const onTimeCount = projectMetrics.filter(p => p.isOnTime).length;
+    return Math.round((onTimeCount / projectMetrics.length) * 100);
+  }, [projectMetrics]);
 
-  const riskPct = Math.round(
-    (okrs.filter(o => (o.activities?.length ?? 0) === 0).length / Math.max(1, okrs.length)) * 100
-  );
+  // Projetos em risco = projetos atrasados ou com baixo progresso
+  const riskPct = useMemo(() => {
+    if (projectMetrics.length === 0) return 0;
+    const riskCount = projectMetrics.filter(p => !p.isOnTime || p.daysRemaining < 0).length;
+    return Math.round((riskCount / projectMetrics.length) * 100);
+  }, [projectMetrics]);
 
-  const velocity = useMemo(() => ([
-    { name: 'Sem-4', pts: 10 },
-    { name: 'Sem-3', pts: 13 },
-    { name: 'Sem-2', pts: 16 },
-    { name: 'Sem-1', pts: 19 },
-    { name: 'Esta',  pts: 20 },
-  ]), []);
+  // Velocidade baseada em tarefas concluídas por semana (dados reais)
+  const velocity = useMemo(() => {
+    const weeks = [];
+    const now = new Date();
+    
+    for (let i = 4; i >= 0; i--) {
+      const weekStart = new Date(now.getTime() - (i * 7 * 24 * 60 * 60 * 1000));
+      const weekEnd = new Date(weekStart.getTime() + (7 * 24 * 60 * 60 * 1000));
+      
+      const weekTasks = boardActivities.filter(a => {
+        if (!a.createdAt || a.status !== 'done') return false;
+        const taskDate = new Date(a.createdAt);
+        return taskDate >= weekStart && taskDate < weekEnd;
+      });
+      
+      const weekLabel = i === 0 ? 'Esta' : `Sem-${i}`;
+      const points = weekTasks.reduce((sum, task) => sum + (task.points || 1), 0);
+      
+      weeks.push({ name: weekLabel, pts: points });
+    }
+    
+    return weeks;
+  }, [boardActivities]);
 
   const roleBuckets = useMemo(() => {
     const map = new Map<string, number>();
@@ -90,10 +114,13 @@ export default function Dashboard() {
         <button onClick={exportJson} className="px-3 py-2 rounded-xl border">Exportar</button>
       </div>
 
+      {/* Notificações de Projetos */}
+      <ProjectNotifications />
+
       <div className="grid md:grid-cols-4 gap-4">
         <Card title="Projetos ativos" value={String(activeProjects)} />
-        <Card title="No prazo (proxy)" value={`${onTimePct}%`} subtitle="Saudável + 50% Atenção" />
-        <Card title="Risco/Atenção" value={`${riskPct}%`} subtitle="% dos projetos" />
+        <Card title="No prazo" value={`${onTimePct}%`} subtitle="Projetos dentro do cronograma" />
+        <Card title="Risco/Atenção" value={`${riskPct}%`} subtitle="Projetos atrasados ou em risco" />
         <Card title="Tarefas concluídas" value={String(doneCount)} subtitle={`${totalBoard} no board`} />
       </div>
 

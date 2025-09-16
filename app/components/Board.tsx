@@ -2,21 +2,24 @@
 import { useMemo, useState } from 'react';
 import { useAppStore, BoardActivity } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
+import ProjectModal from './ProjectModal';
 
 const COLUMNS: { key: BoardActivity['status']; title: string }[] = [
+  { key: 'backlog', title: 'Backlog' },
   { key: 'todo', title: 'A Fazer' },
   { key: 'doing', title: 'Em Progresso' },
   { key: 'done', title: 'Concluído' },
+  { key: 'historical', title: 'Projetos Históricos' },
 ];
 
-function fmtDate(iso?: string) {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString('pt-BR');
-  } catch {
-    return iso;
-  }
-}
+// function fmtDate(iso?: string) {
+//   if (!iso) return '';
+//   try {
+//     return new Date(iso).toLocaleDateString('pt-BR');
+//   } catch {
+//     return iso;
+//   }
+// }
 
 export default function Board() {
   const activities = useAppStore((s) => s.boardActivities);
@@ -24,6 +27,10 @@ export default function Board() {
   const add = useAppStore((s) => s.addBoardActivity);
   const del = useAppStore((s) => s.deleteBoardActivity);
   const collaborators = useAppStore((s) => s.collaborators);
+  const projects = useAppStore((s) => s.projects);
+
+  // Modal de projeto
+  const [showProjectModal, setShowProjectModal] = useState(false);
 
   // Novo card
   const [openNew, setOpenNew] = useState(false);
@@ -31,6 +38,7 @@ export default function Board() {
   const [points, setPoints] = useState<number | ''>('');
   const [assigneeId, setAssigneeId] = useState<string>('');
   const [client, setClient] = useState('');
+  const [projectId, setProjectId] = useState<string>('');
   const [subtasks, setSubtasks] = useState<string[]>(['']);
 
   // Modal de edição
@@ -39,6 +47,7 @@ export default function Board() {
   const [editPoints, setEditPoints] = useState<number | ''>('');
   const [editAssigneeId, setEditAssigneeId] = useState<string>('');
   const [editClient, setEditClient] = useState('');
+  const [editProjectId, setEditProjectId] = useState<string>('');
   const [editSubtasks, setEditSubtasks] = useState<string[]>(['']);
 
   const canAdd = title.trim().length > 0;
@@ -63,10 +72,11 @@ export default function Board() {
     if (!canAdd) return;
     const validSubtasks = subtasks.filter(s => s.trim().length > 0);
     add(title.trim(), {
-      status: 'todo',
+      status: 'backlog',
       points: typeof points === 'number' ? points : undefined,
       assigneeId: assigneeId || undefined,
       client: client || undefined,
+      projectId: projectId || undefined,
       subtasks: validSubtasks.length > 0 ? validSubtasks : undefined,
     });
     toast.success('Tarefa adicionada com sucesso!');
@@ -74,6 +84,7 @@ export default function Board() {
     setPoints('');
     setAssigneeId('');
     setClient('');
+    setProjectId('');
     setSubtasks(['']);
     setOpenNew(false);
   };
@@ -84,6 +95,7 @@ export default function Board() {
     setEditPoints(card.points || '');
     setEditAssigneeId(card.assigneeId || '');
     setEditClient(card.client || '');
+    setEditProjectId(card.projectId || '');
     setEditSubtasks(card.subtasks && card.subtasks.length > 0 ? card.subtasks : ['']);
   };
 
@@ -93,6 +105,7 @@ export default function Board() {
     setEditPoints('');
     setEditAssigneeId('');
     setEditClient('');
+    setEditProjectId('');
     setEditSubtasks(['']);
   };
 
@@ -104,6 +117,7 @@ export default function Board() {
       points: typeof editPoints === 'number' ? editPoints : undefined,
       assigneeId: editAssigneeId || undefined,
       client: editClient || undefined,
+      projectId: editProjectId || undefined,
       subtasks: validSubtasks.length > 0 ? validSubtasks : undefined,
     });
     toast.success('Tarefa atualizada com sucesso!');
@@ -126,9 +140,11 @@ export default function Board() {
 
   const byCol = useMemo(() => {
     const map: Record<BoardActivity['status'], typeof activities> = {
+      backlog: [],
       todo: [],
       doing: [],
       done: [],
+      historical: [],
     };
     for (const a of activities) map[a.status].push(a);
     return map;
@@ -140,12 +156,20 @@ export default function Board() {
         <div className="text-sm text-gray-600">
           Arraste as cartas entre colunas para mudar o status.
         </div>
-        <button
-          className="ml-auto px-3 py-2 rounded-xl bg-black text-white"
-          onClick={() => setOpenNew((v) => !v)}
-        >
-          + Nova tarefa
-        </button>
+        <div className="ml-auto flex gap-2">
+          <button
+            className="px-3 py-2 rounded-xl border border-blue-500 text-blue-500 hover:bg-blue-50"
+            onClick={() => setShowProjectModal(true)}
+          >
+            + Novo Projeto
+          </button>
+          <button
+            className="px-3 py-2 rounded-xl bg-black text-white"
+            onClick={() => setOpenNew((v) => !v)}
+          >
+            + Nova tarefa
+          </button>
+        </div>
       </div>
 
       {openNew && (
@@ -159,9 +183,16 @@ export default function Board() {
             />
             <input
               className="border rounded-xl p-2"
-              placeholder="Cliente"
+              placeholder="Cliente/Projeto"
               value={client}
-              onChange={(e) => setClient(e.target.value)}
+              onChange={(e) => {
+                setClient(e.target.value);
+                // Auto-seleciona projeto se existe um com mesmo nome do cliente
+                const matchingProject = projects.find(p => p.client === e.target.value || p.name === e.target.value);
+                if (matchingProject) {
+                  setProjectId(matchingProject.id);
+                }
+              }}
             />
             <div className="flex gap-3">
               <input
@@ -174,7 +205,7 @@ export default function Board() {
               />
             </div>
             <select
-              className="border rounded-xl p-2 md:col-span-2"
+              className="border rounded-xl p-2"
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
             >
@@ -182,6 +213,18 @@ export default function Board() {
               {collaborators.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="border rounded-xl p-2"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+            >
+              <option value="">Sem projeto</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -350,7 +393,7 @@ export default function Board() {
                 />
               </div>
               <select
-                className="border rounded-xl p-2 md:col-span-2"
+                className="border rounded-xl p-2"
                 value={editAssigneeId}
                 onChange={(e) => setEditAssigneeId(e.target.value)}
               >
@@ -358,6 +401,18 @@ export default function Board() {
                 {collaborators.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="border rounded-xl p-2"
+                value={editProjectId}
+                onChange={(e) => setEditProjectId(e.target.value)}
+              >
+                <option value="">Sem projeto</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
                   </option>
                 ))}
               </select>
@@ -424,6 +479,16 @@ export default function Board() {
           </div>
         </div>
       )}
+
+      {/* Modal de Projeto */}
+      <ProjectModal
+        isOpen={showProjectModal}
+        onClose={() => setShowProjectModal(false)}
+        onSuccess={() => {
+          setShowProjectModal(false);
+          toast.success('Projeto criado! Agora você pode vinculá-lo às tarefas.');
+        }}
+      />
     </div>
   );
 }

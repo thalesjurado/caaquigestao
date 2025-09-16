@@ -53,7 +53,7 @@ interface AppState {
 
 interface AppActions {
   // Board Activities
-  addBoardActivity: (title: string, extra?: Partial<BoardActivity>) => void;
+  addBoardActivity: (activity: Omit<BoardActivity, 'id' | 'createdAt'>) => void;
   updateBoardActivity: (id: string, patch: Partial<BoardActivity>) => void;
   deleteBoardActivity: (id: string) => void;
   
@@ -80,7 +80,7 @@ const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 export const useAppStore = create<AppState & AppActions>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Estado inicial
       boardActivities: [],
       collaborators: [],
@@ -88,20 +88,14 @@ export const useAppStore = create<AppState & AppActions>()(
       rituals: [],
 
       // Board Activities
-      addBoardActivity: (title, extra) => {
-        const activity: BoardActivity = {
+      addBoardActivity: (activity: Omit<BoardActivity, 'id' | 'createdAt'>) => {
+        const newActivity: BoardActivity = {
           id: uid(),
-          title,
-          status: extra?.status ?? 'todo',
-          assigneeId: extra?.assigneeId,
-          description: extra?.description,
-          client: extra?.client,
-          points: extra?.points,
-          createdAt: extra?.createdAt ?? new Date(),
-          subtasks: extra?.subtasks,
+          createdAt: new Date(),
+          ...activity,
         };
         set((state) => ({
-          boardActivities: [...state.boardActivities, activity]
+          boardActivities: [...state.boardActivities, newActivity]
         }));
       },
 
