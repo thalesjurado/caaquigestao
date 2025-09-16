@@ -2,11 +2,10 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Link from 'next/link';
-import { useAppStore } from '../../lib/store';
+import { useAppStore } from '../../lib/store-supabase';
 
 export default function ProjectsPage() {
-  const okrs = useAppStore(s => s.okrs ?? []);
-  const { boardActivities, collaborators } = useAppStore();
+  const { projects, boardActivities, collaborators } = useAppStore();
   const board = boardActivities ?? [];
   type Activity = typeof board[number];
 

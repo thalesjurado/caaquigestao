@@ -411,7 +411,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         set((state) => ({
           boardActivities: [...state.boardActivities, converted]
         }));
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao criar atividade no Supabase, usando localStorage');
         
         // Fallback: salva no localStorage
@@ -444,7 +444,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             a.id === id ? { ...a, ...converted } : a
           )
         }));
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao atualizar atividade no Supabase, usando localStorage');
         
         // Fallback: atualiza no localStorage
@@ -458,7 +458,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         
         // Atualiza localStorage
         const localActivities = JSON.parse(localStorage.getItem('caaqui_board_activities') || '[]');
-        const updatedLocalActivities = localActivities.map((a: any) => 
+        const updatedLocalActivities = localActivities.map((a: { id: string }) => 
           a.id === id ? { ...a, ...convertToSupabase.boardActivity(updatedActivity) } : a
         );
         localStorage.setItem('caaqui_board_activities', JSON.stringify(updatedLocalActivities));
@@ -474,7 +474,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       // Tenta deletar no Supabase primeiro
       try {
         await boardActivitiesAPI.delete(id);
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao deletar atividade no Supabase, usando localStorage');
         
         // Fallback: remove do localStorage
@@ -710,7 +710,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         set((state) => ({
           projects: [...state.projects, converted]
         }));
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao criar projeto no Supabase, usando localStorage');
         
         // Fallback: salva no localStorage
@@ -744,7 +744,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             p.id === id ? { ...p, ...converted } : p
           )
         }));
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao atualizar no Supabase, usando localStorage');
         
         // Fallback: atualiza no localStorage
@@ -758,7 +758,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         
         // Atualiza localStorage
         const localProjects = JSON.parse(localStorage.getItem('caaqui_projects') || '[]');
-        const updatedLocalProjects = localProjects.map((p: any) => 
+        const updatedLocalProjects = localProjects.map((p: { id: string }) => 
           p.id === id ? { ...p, ...convertToSupabase.project(updatedProject) } : p
         );
         localStorage.setItem('caaqui_projects', JSON.stringify(updatedLocalProjects));
@@ -774,7 +774,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       // Tenta deletar no Supabase primeiro
       try {
         await projectsAPI.delete(id);
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao deletar no Supabase, usando localStorage');
         
         // Fallback: remove do localStorage
@@ -810,7 +810,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         set((state) => ({
           projectAllocations: [...state.projectAllocations, converted]
         }));
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao criar alocação no Supabase, usando localStorage');
         
         // Fallback: salva no localStorage
@@ -843,7 +843,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             a.id === id ? { ...a, ...converted } : a
           )
         }));
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao atualizar alocação no Supabase, usando localStorage');
         
         // Fallback: atualiza no localStorage
@@ -857,7 +857,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         
         // Atualiza localStorage
         const localAllocations = JSON.parse(localStorage.getItem('caaqui_project_allocations') || '[]');
-        const updatedLocalAllocations = localAllocations.map((a: any) => 
+        const updatedLocalAllocations = localAllocations.map((a: { id: string }) => 
           a.id === id ? { ...a, ...convertToSupabase.projectAllocation(updatedAllocation) } : a
         );
         localStorage.setItem('caaqui_project_allocations', JSON.stringify(updatedLocalAllocations));
@@ -873,7 +873,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       // Tenta deletar no Supabase primeiro
       try {
         await projectAllocationsAPI.delete(id);
-      } catch (supabaseError: unknown) {
+      } catch {
         console.warn('⚠️ Erro ao deletar alocação no Supabase, usando localStorage');
         
         // Fallback: remove do localStorage
