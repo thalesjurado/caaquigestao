@@ -7,26 +7,43 @@ export default function DataLoader({ children }: { children: React.ReactNode }) 
   const loadAllData = useAppStore(s => s.loadAllData);
   const isLoading = useAppStore(s => s.isLoading);
   const error = useAppStore(s => s.error);
+  const setLoading = useAppStore(s => s.setLoading);
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
+      // Timeout de segurança: se demorar demais, usa fallback local
+      const TIMEOUT_MS = 8000;
+      const timeoutId = setTimeout(() => {
+        console.warn('⏳ Timeout ao carregar dados remotos. Ativando fallback local.');
+        setShowFallback(true);
+        setLoading(false);
+      }, TIMEOUT_MS);
+
       try {
         await loadAllData();
         
         // Se houver erro relacionado a projects/project_allocations, usa fallback
         if (error && (error.includes('projects') || error.includes('project_allocations'))) {
-          console.log(' Usando sistema de fallback para projects e project_allocations');
+          console.log('Usando sistema de fallback para projects e project_allocations');
           setShowFallback(true);
         }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         setShowFallback(true);
+        setLoading(false);
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
     loadData();
-  }, [loadAllData, error]);
+  }, [loadAllData, error, setLoading]);
+
+  // Se o fallback foi ativado, rendeiriza a aplicação mesmo que o estado global ainda marque loading
+  if (showFallback) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
