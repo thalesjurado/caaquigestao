@@ -6,9 +6,14 @@ import { Project } from '../../lib/types';
 import { toast } from '../../lib/toast';
 import ProjectModal from './ProjectModal';
 
+const typeColors = {
+  'tech': { color: 'bg-blue-100 text-blue-800', label: 'Tech' },
+  'growth': { color: 'bg-green-100 text-green-800', label: 'Growth' }
+};
+
 const PROJECT_TYPES = [
-  { value: 'tech_implementation', label: 'Tech Implementation', color: 'bg-blue-100 text-blue-800' },
-  { value: 'growth_agency', label: 'Growth/Agency', color: 'bg-green-100 text-green-800' }
+  { value: 'tech', label: 'Tech Implementation', color: typeColors['tech'].color },
+  { value: 'growth', label: 'Growth/Agency', color: typeColors['growth'].color }
 ] as const;
 
 const PROJECT_STATUS = [
@@ -187,13 +192,13 @@ export default function Projects() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-blue-50 rounded-xl p-4">
           <div className="text-2xl font-bold text-blue-600">
-            {projects.filter(p => p.type === 'tech_implementation').length}
+            {projects.filter(p => p.type === 'tech').length}
           </div>
           <div className="text-sm text-blue-600">Tech Implementation</div>
         </div>
         <div className="bg-green-50 rounded-xl p-4">
           <div className="text-2xl font-bold text-green-600">
-            {projects.filter(p => p.type === 'growth_agency').length}
+            {projects.filter(p => p.type === 'growth').length}
           </div>
           <div className="text-sm text-green-600">Growth/Agency</div>
         </div>

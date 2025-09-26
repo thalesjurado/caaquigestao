@@ -4,8 +4,8 @@ export interface Project {
   id: string;
   name: string;
   client: string;
-  type: 'tech_implementation' | 'growth_agency';
-  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+  type: 'tech' | 'growth';
+  status: 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled' | 'archived';
   startDate: Date;
   endDate: Date;
   description?: string;
@@ -14,9 +14,13 @@ export interface Project {
   // Alocação da equipe
   allocations: ProjectAllocation[];
   
-  // Metadados específicos por tipo
+  // Data de arquivamento
+  archivedAt?: Date;
+  
+  // Detalhes específicos para projetos tech
   techDetails?: {
-    sdkType?: string;
+    platform?: string;
+    integrations?: string[];
     cdpIntegration?: string;
     martechTools?: string[];
   };
@@ -61,6 +65,8 @@ export interface Collaborator {
   avatar?: string;
   hourlyRate?: number; // Para cálculos de custo
   maxAllocation?: number; // Máximo % que pode ser alocado (default 100)
+  accessLevel: 'operations' | 'management' | 'executive'; // Nível de acesso
+  position: string; // Cargo específico (ex: "Desenvolvedor", "Tech Lead", "Sócio")
 }
 
 export interface OKR {
@@ -102,14 +108,13 @@ export interface TeamAvailability {
 
 // Tipos para métricas de projeto
 export interface ProjectMetrics {
-  projectId: string;
+  id: string;
   name: string;
-  client: string;
-  type: string;
-  status: string;
-  progress: number; // % baseado em tarefas concluídas
+  status: Project['status'];
+  progressPct: number;
   daysRemaining: number;
   isOnTime: boolean;
-  teamSize: number;
   totalAllocation: number;
+  realCost: number;
+  budgetVariance: number;
 }

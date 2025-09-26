@@ -124,6 +124,57 @@ export default function Dashboard() {
         <Card title="Tarefas concluídas" value={String(doneCount)} subtitle={`${totalBoard} no board`} />
       </div>
 
+      {/* Custos dos Projetos */}
+      <div className="rounded-2xl border p-4">
+        <h3 className="font-medium mb-4">Custos dos Projetos Ativos</h3>
+        <div className="space-y-3">
+          {projectMetrics
+            .filter(p => p.status === 'active')
+            .map(project => (
+              <div key={project.id} className="bg-gray-50 rounded-lg p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <span className="font-medium">{project.name}</span>
+                    <div className="text-xs text-gray-600">
+                      {project.daysRemaining > 0 ? `${project.daysRemaining} dias restantes` : 'Atrasado'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium">
+                      R$ {project.realCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className={`text-xs ${
+                      project.budgetVariance > 10 ? 'text-red-600' :
+                      project.budgetVariance > 0 ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {project.budgetVariance > 0 ? '+' : ''}{project.budgetVariance.toFixed(1)}% do orçamento
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">
+                    Progresso: {project.progressPct.toFixed(1)}%
+                  </span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    !project.isOnTime ? 'bg-red-100 text-red-800' :
+                    project.progressPct > 80 ? 'bg-green-100 text-green-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {!project.isOnTime ? 'Atrasado' :
+                     project.progressPct > 80 ? 'No prazo' :
+                     'Em andamento'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          {projectMetrics.filter(p => p.status === 'active').length === 0 && (
+            <div className="text-sm text-gray-500">Nenhum projeto ativo no momento.</div>
+          )}
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
         <div className="rounded-2xl border p-4">
           <h3 className="font-medium mb-2">Velocidade (pontos/semana)</h3>
@@ -157,21 +208,77 @@ export default function Dashboard() {
       </div>
 
       <div className="rounded-2xl border p-4">
-        <h3 className="font-medium mb-2">Utilização por pessoa (pontos/semana)</h3>
-        <div className="space-y-2">
+        <h3 className="font-medium mb-2">Utilização por pessoa</h3>
+        <div className="space-y-3">
           {collaborators.map((c) => {
-            const pts = okrs.reduce((sum, o) =>
-              sum + (o.activities?.filter(a => a.assigneeId === c.id).length || 0), 0);
-            const pct = Math.min(100, Math.round((pts / 15) * 100));
+            // Calcular alocação total e projetos simultâneos
+            const { projectAllocations } = useAppStore.getState();
+            const now = new Date();
+            
+            const activeAllocations = projectAllocations.filter(a => 
+              a.collaboratorId === c.id && 
+              new Date(a.endDate) > now &&
+              new Date(a.startDate) <= now
+            );
+            
+            const totalAllocation = activeAllocations.reduce((sum, a) => sum + a.percentage, 0);
+            const simultaneousProjects = activeAllocations.length;
+            
+            // Calcular carga de horas (assumindo 40h/semana como 100%)
+            const weeklyHours = Math.round((totalAllocation / 100) * 40);
+            
             return (
-              <div key={c.id}>
-                <div className="flex justify-between text-sm">
-                  <span>{c.name}</span>
-                  <span>{pts} pts • {pct}%</span>
+              <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <span className="font-medium">{c.name}</span>
+                    <div className="text-xs text-gray-600">{c.position || c.role}</div>
+                  </div>
+                  <div className="text-right text-sm">
+                    <div className="font-medium">{totalAllocation}%</div>
+                    <div className="text-xs text-gray-600">{weeklyHours}h/semana</div>
+                  </div>
                 </div>
+                
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">
+                    {simultaneousProjects} projeto{simultaneousProjects !== 1 ? 's' : ''} simultâneo{simultaneousProjects !== 1 ? 's' : ''}
+                  </span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    totalAllocation > 100 ? 'bg-red-100 text-red-800' :
+                    totalAllocation > 80 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {totalAllocation > 100 ? 'Sobrealocado' :
+                     totalAllocation > 80 ? 'Alta utilização' :
+                     'Disponível'}
+                  </span>
+                </div>
+                
                 <div className="h-2 bg-gray-200 rounded-xl">
-                  <div className="h-2 rounded-xl bg-black" style={{ width: `${pct}%` }} />
+                  <div 
+                    className={`h-2 rounded-xl ${
+                      totalAllocation > 100 ? 'bg-red-500' :
+                      totalAllocation > 80 ? 'bg-yellow-500' :
+                      'bg-green-500'
+                    }`} 
+                    style={{ width: `${Math.min(100, totalAllocation)}%` }} 
+                  />
                 </div>
+                
+                {activeAllocations.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {activeAllocations.map(allocation => {
+                      const project = projects.find(p => p.id === allocation.projectId);
+                      return (
+                        <div key={allocation.id} className="flex justify-between text-xs text-gray-600">
+                          <span>{project?.name || 'Projeto não encontrado'}</span>
+                          <span>{allocation.percentage}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}

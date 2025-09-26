@@ -69,7 +69,7 @@ export default function ProjectModal({ isOpen, onClose, editingProject, onSucces
     setFormData({
       name: '',
       client: '',
-      type: 'tech_implementation',
+      type: 'tech',
       status: 'planning',
       startDate: '',
       endDate: '',
@@ -97,7 +97,7 @@ export default function ProjectModal({ isOpen, onClose, editingProject, onSucces
         endDate: editingProject.endDate.toISOString().split('T')[0],
         description: editingProject.description || '',
         budget: editingProject.budget?.toString() || '',
-        sdkType: editingProject.techDetails?.sdkType || '',
+        sdkType: editingProject.techDetails?.platform || '',
         cdpIntegration: editingProject.techDetails?.cdpIntegration || '',
         martechTools: editingProject.techDetails?.martechTools?.join(', ') || '',
         crmPlatform: editingProject.growthDetails?.crmPlatform || '',
@@ -181,12 +181,12 @@ export default function ProjectModal({ isOpen, onClose, editingProject, onSucces
       endDate: new Date(formData.endDate),
       description: formData.description || undefined,
       budget: formData.budget ? parseFloat(formData.budget) : undefined,
-      techDetails: formData.type === 'tech_implementation' ? {
-        sdkType: formData.sdkType || undefined,
-        cdpIntegration: formData.cdpIntegration || undefined,
+      techDetails: formData.type === 'tech' ? {
+        platform: formData.sdkType,
+        cdpIntegration: formData.cdpIntegration,
         martechTools: formData.martechTools ? formData.martechTools.split(',').map(s => s.trim()) : undefined
       } : undefined,
-      growthDetails: formData.type === 'growth_agency' ? {
+      growthDetails: formData.type === 'growth' ? {
         crmPlatform: formData.crmPlatform || undefined,
         campaignType: formData.campaignType || undefined,
         expectedResults: formData.expectedResults || undefined
@@ -383,13 +383,13 @@ export default function ProjectModal({ isOpen, onClose, editingProject, onSucces
           </div>
 
           {/* Campos específicos por tipo */}
-          {formData.type === 'tech_implementation' && (
+          {formData.type === 'tech' && (
             <div className="space-y-4 border-t pt-4">
               <h4 className="font-medium text-gray-700">Detalhes Técnicos</h4>
               <div className="grid md:grid-cols-2 gap-4">
                 <input
                   type="text"
-                  placeholder="Tipo de SDK"
+                  placeholder="Plataforma"
                   value={formData.sdkType}
                   onChange={(e) => setFormData({...formData, sdkType: e.target.value})}
                   className="border rounded-lg p-3"
@@ -412,7 +412,7 @@ export default function ProjectModal({ isOpen, onClose, editingProject, onSucces
             </div>
           )}
 
-          {formData.type === 'growth_agency' && (
+          {formData.type === 'growth' && (
             <div className="space-y-4 border-t pt-4">
               <h4 className="font-medium text-gray-700">Detalhes de Growth</h4>
               <div className="grid md:grid-cols-2 gap-4">

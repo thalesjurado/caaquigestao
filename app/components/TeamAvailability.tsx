@@ -224,13 +224,14 @@ export default function TeamAvailability() {
       <div className="bg-white border rounded-xl p-6">
         <h2 className="text-lg font-semibold mb-4">Resumo de Projetos Ativos</h2>
         
-        {projectMetrics.filter(p => p.status === 'active').length > 0 ? (
+        {projects.filter(p => p.status === 'active').length > 0 ? (
           <div className="grid gap-4">
-            {projectMetrics
+            {projects
               .filter(p => p.status === 'active')
-              .sort((a, b) => a.daysRemaining - b.daysRemaining)
-              .map(project => (
-                <div key={project.projectId} className="flex justify-between items-center p-4 border rounded-lg">
+              .map(project => {
+                const metrics = projectMetrics.find(m => m.id === project.id);
+                return (
+                <div key={project.id} className="flex justify-between items-center p-4 border rounded-lg">
                   <div>
                     <h4 className="font-medium">{project.name}</h4>
                     <p className="text-sm text-gray-600">{project.client} • {project.type}</p>
@@ -238,18 +239,19 @@ export default function TeamAvailability() {
                   <div className="text-right">
                     <div className="flex gap-4 text-sm">
                       <span>
-                        <strong>{project.teamSize}</strong> pessoas
+                        <strong>{project.allocations?.length || 0}</strong> pessoas
                       </span>
                       <span>
-                        <strong>{Math.round(project.progress)}%</strong> concluído
+                        <strong>0%</strong> concluído
                       </span>
-                      <span className={project.daysRemaining > 0 ? 'text-green-600' : 'text-red-600'}>
-                        <strong>{Math.abs(project.daysRemaining)}</strong> dias {project.daysRemaining > 0 ? 'restantes' : 'em atraso'}
+                      <span className="text-green-600">
+                        <strong>{Math.ceil((project.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}</strong> dias restantes
                       </span>
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">

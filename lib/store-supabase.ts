@@ -17,6 +17,7 @@ import {
   SupabaseProjectAllocation
 } from './supabase';
 import { Project, ProjectAllocation, TeamAvailability, ProjectMetrics } from './types';
+import { saveToStorage, loadFromStorage, STORAGE_KEYS, setupStorageSync } from './data-sync';
 
 // Tipos locais (mantendo compatibilidade)
 export interface BoardActivity {
@@ -41,6 +42,8 @@ export interface Collaborator {
   avatar?: string;
   hourlyRate?: number;
   maxAllocation?: number;
+  accessLevel: 'operations' | 'management' | 'executive';
+  position: string;
 }
 
 export interface OKR {
@@ -85,6 +88,8 @@ const convertFromSupabase = {
     email: item.email,
     role: item.role,
     avatar: item.avatar,
+    accessLevel: 'operations', // Default para compatibilidade
+    position: item.role || 'Membro', // Usar role como position por padrão
   }),
 
   okr: (item: SupabaseOKR): OKR => ({
@@ -108,13 +113,14 @@ const convertFromSupabase = {
     id: item.id,
     name: item.name,
     client: item.client,
-    type: item.type,
-    status: item.status,
+    type: item.type === 'tech_implementation' ? 'tech' : 'growth',
+    status: item.status as Project['status'],
     startDate: new Date(item.start_date),
     endDate: new Date(item.end_date),
     description: item.description,
     budget: item.budget,
     allocations: [], // Será preenchido separadamente
+    archivedAt: (item as any).archived_at ? new Date((item as any).archived_at) : undefined,
     techDetails: item.tech_details,
     growthDetails: item.growth_details,
   }),
@@ -167,11 +173,10 @@ const convertToSupabase = {
   }),
 
   project: (item: Partial<Project>): Partial<SupabaseProject> => ({
-    id: item.id,
     name: item.name,
     client: item.client,
-    type: item.type,
-    status: item.status,
+    type: item.type === 'tech' ? 'tech_implementation' : 'growth_agency',
+    status: item.status === 'archived' ? 'cancelled' : item.status,
     start_date: item.startDate?.toISOString(),
     end_date: item.endDate?.toISOString(),
     description: item.description,
@@ -214,6 +219,7 @@ interface AppActions {
   addBoardActivity: (title: string, extra?: Partial<BoardActivity>) => Promise<void>;
   updateBoardActivity: (id: string, patch: Partial<BoardActivity>) => Promise<void>;
   deleteBoardActivity: (id: string) => Promise<void>;
+  duplicateBoardActivity: (id: string) => Promise<void>;
   
   // Collaborators
   addCollaborator: (collaborator: Omit<Collaborator, 'id'>) => Promise<void>;
@@ -237,6 +243,12 @@ interface AppActions {
   addProject: (project: Omit<Project, 'id' | 'allocations'>) => Promise<void>;
   updateProject: (id: string, patch: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  archiveProject: (id: string) => Promise<void>;
+  restoreProject: (id: string) => Promise<void>;
+  permanentlyDeleteProject: (id: string) => Promise<void>;
+  cleanupArchivedProjects: () => Promise<void>;
+  duplicateProject: (id: string, newName?: string) => Promise<void>;
+  createProjectFromTemplate: (templateId: string, projectName: string, client: string) => Promise<void>;
   
   // Project Allocations
   addProjectAllocation: (allocation: Omit<ProjectAllocation, 'id'>) => Promise<void>;
@@ -359,9 +371,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
       if (boardActivities.length === 0) {
         try {
-          const localActivities = localStorage.getItem('caaqui_board_activities');
-          if (localActivities) {
-            finalBoardActivities = JSON.parse(localActivities);
+          finalBoardActivities = loadFromStorage(STORAGE_KEYS.BOARD_ACTIVITIES);
+          if (finalBoardActivities.length > 0) {
             console.log('📦 Carregando board_activities do localStorage:', finalBoardActivities.length);
           }
         } catch (err) {
@@ -414,10 +425,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       } catch {
         console.warn('⚠️ Erro ao criar atividade no Supabase, usando localStorage');
         
-        // Fallback: salva no localStorage
-        const localActivities = JSON.parse(localStorage.getItem('caaqui_board_activities') || '[]');
+        // Fallback: salva no localStorage com sistema melhorado
+        const localActivities = loadFromStorage(STORAGE_KEYS.BOARD_ACTIVITIES);
         localActivities.push(activity);
-        localStorage.setItem('caaqui_board_activities', JSON.stringify(localActivities));
+        saveToStorage(STORAGE_KEYS.BOARD_ACTIVITIES, localActivities);
         
         // Atualiza estado local
         const converted = convertFromSupabase.boardActivity(activity);
@@ -456,12 +467,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           )
         }));
         
-        // Atualiza localStorage
-        const localActivities = JSON.parse(localStorage.getItem('caaqui_board_activities') || '[]');
-        const updatedLocalActivities = localActivities.map((a: { id: string }) => 
+        // Atualiza localStorage com sistema melhorado
+        const localActivities = loadFromStorage(STORAGE_KEYS.BOARD_ACTIVITIES);
+        const updatedLocalActivities = localActivities.map((a: any) => 
           a.id === id ? { ...a, ...convertToSupabase.boardActivity(updatedActivity) } : a
         );
-        localStorage.setItem('caaqui_board_activities', JSON.stringify(updatedLocalActivities));
+        saveToStorage(STORAGE_KEYS.BOARD_ACTIVITIES, updatedLocalActivities);
       }
     } catch (error) {
       console.error('Erro ao atualizar atividade:', error);
@@ -477,10 +488,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       } catch {
         console.warn('⚠️ Erro ao deletar atividade no Supabase, usando localStorage');
         
-        // Fallback: remove do localStorage
-        const localActivities = JSON.parse(localStorage.getItem('caaqui_board_activities') || '[]');
-        const filteredActivities = localActivities.filter((a: { id: string }) => a.id !== id);
-        localStorage.setItem('caaqui_board_activities', JSON.stringify(filteredActivities));
+        // Fallback: remove do localStorage com sistema melhorado
+        const localActivities = loadFromStorage(STORAGE_KEYS.BOARD_ACTIVITIES);
+        const filteredActivities = localActivities.filter((a: any) => a.id !== id);
+        saveToStorage(STORAGE_KEYS.BOARD_ACTIVITIES, filteredActivities);
       }
       
       // Remove do estado local sempre
@@ -951,42 +962,226 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   getProjectMetrics: () => {
-    const state = get();
-    const metrics: ProjectMetrics[] = [];
+    const { projects, projectAllocations, collaborators } = get();
     
-    state.projects.forEach(project => {
-      const tasks = state.boardActivities.filter(a => a.projectId === project.id);
-      const completedTasks = tasks.filter(a => a.status === 'done').length;
-      const progress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+    return projects.map(project => {
+      const allocations = projectAllocations.filter(a => a.projectId === project.id);
+      const totalAllocation = allocations.reduce((sum, a) => a.percentage, 0);
       
+      // Calcular custo real baseado no valor/hora dos colaboradores
+      const realCost = allocations.reduce((sum, allocation) => {
+        const collaborator = collaborators.find(c => c.id === allocation.collaboratorId);
+        if (!collaborator?.hourlyRate) return sum;
+        
+        // Calcular duração da alocação em semanas
+        const startDate = new Date(allocation.startDate);
+        const endDate = new Date(allocation.endDate);
+        const weeks = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+        
+        // Calcular horas totais (assumindo 40h/semana como 100% de alocação)
+        const hoursPerWeek = (allocation.percentage / 100) * 40;
+        const totalHours = hoursPerWeek * weeks;
+        
+        return sum + (totalHours * collaborator.hourlyRate);
+      }, 0);
+      
+      const startDate = new Date(project.startDate);
+      const endDate = new Date(project.endDate);
       const now = new Date();
-      const daysRemaining = Math.ceil((project.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const isOnTime = daysRemaining >= 0 && progress >= 50; // Heurística simples
       
-      const allocations = state.projectAllocations.filter(a => a.projectId === project.id);
-      const teamSize = allocations.length;
-      const totalAllocation = allocations.reduce((sum, a) => sum + a.percentage, 0);
-
-      metrics.push({
-        projectId: project.id,
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const elapsedDays = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const progressPct = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+      const isOnTime = daysRemaining >= 0 && progressPct <= 100;
+      
+      return {
+        id: project.id,
         name: project.name,
-        client: project.client,
-        type: project.type,
         status: project.status,
-        progress,
+        progressPct,
         daysRemaining,
         isOnTime,
-        teamSize,
-        totalAllocation
-      });
+        totalAllocation,
+        realCost,
+        budgetVariance: project.budget ? ((realCost - project.budget) / project.budget) * 100 : 0
+      };
     });
+  },
 
-    return metrics;
+  // Funções de arquivamento de projetos
+  archiveProject: async (id: string) => {
+    try {
+      const archivedAt = new Date();
+      await get().updateProject(id, { 
+        status: 'archived', 
+        archivedAt 
+      });
+    } catch (error) {
+      console.error('Erro ao arquivar projeto:', error);
+      set({ error: 'Erro ao arquivar projeto' });
+    }
+  },
+
+  restoreProject: async (id: string) => {
+    try {
+      await get().updateProject(id, { 
+        status: 'active', 
+        archivedAt: undefined 
+      });
+    } catch (error) {
+      console.error('Erro ao restaurar projeto:', error);
+      set({ error: 'Erro ao restaurar projeto' });
+    }
+  },
+
+  permanentlyDeleteProject: async (id: string) => {
+    try {
+      await get().deleteProject(id);
+    } catch (error) {
+      console.error('Erro ao excluir projeto permanentemente:', error);
+      set({ error: 'Erro ao excluir projeto permanentemente' });
+    }
+  },
+
+  cleanupArchivedProjects: async () => {
+    try {
+      const { projects } = get();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const projectsToDelete = projects.filter(p => 
+        p.status === 'archived' && 
+        p.archivedAt && 
+        p.archivedAt < thirtyDaysAgo
+      );
+
+      for (const project of projectsToDelete) {
+        await get().permanentlyDeleteProject(project.id);
+      }
+
+      console.log(`Limpeza automática: ${projectsToDelete.length} projetos removidos`);
+    } catch (error) {
+      console.error('Erro na limpeza de projetos arquivados:', error);
+    }
+  },
+
+  duplicateProject: async (id: string, newName?: string) => {
+    try {
+      const { projects, projectAllocations } = get();
+      const originalProject = projects.find(p => p.id === id);
+      
+      if (!originalProject) {
+        throw new Error('Projeto não encontrado');
+      }
+
+      // Criar cópia do projeto
+      const duplicatedProject: Omit<Project, 'id' | 'allocations'> = {
+        name: newName || `${originalProject.name} (Cópia)`,
+        client: originalProject.client,
+        type: originalProject.type,
+        status: 'planning',
+        startDate: new Date(),
+        endDate: new Date(Date.now() + (30 * 24 * 60 * 60 * 1000)), // 30 dias a partir de hoje
+        description: originalProject.description,
+        budget: originalProject.budget,
+        techDetails: originalProject.techDetails,
+        growthDetails: originalProject.growthDetails,
+      };
+
+      // Adicionar projeto duplicado
+      await get().addProject(duplicatedProject);
+
+      // Buscar o projeto recém-criado para obter o ID
+      const { projects: updatedProjects } = get();
+      const newProject = updatedProjects.find(p => p.name === duplicatedProject.name);
+      
+      if (newProject) {
+        // Duplicar alocações do projeto original
+        const originalAllocations = projectAllocations.filter(a => a.projectId === id);
+        
+        for (const allocation of originalAllocations) {
+          const duplicatedAllocation: Omit<ProjectAllocation, 'id'> = {
+            projectId: newProject.id,
+            collaboratorId: allocation.collaboratorId,
+            percentage: allocation.percentage,
+            role: allocation.role,
+            startDate: duplicatedProject.startDate,
+            endDate: duplicatedProject.endDate,
+          };
+          
+          await get().addProjectAllocation(duplicatedAllocation);
+        }
+      }
+
+      console.log('Projeto duplicado com sucesso');
+    } catch (error) {
+      console.error('Erro ao duplicar projeto:', error);
+      set({ error: 'Erro ao duplicar projeto' });
+    }
+  },
+
+  createProjectFromTemplate: async (templateId: string, projectName: string, client: string) => {
+    try {
+      const { getTemplateById, createProjectFromTemplate } = await import('./project-templates');
+      const template = getTemplateById(templateId);
+      
+      if (!template) {
+        throw new Error('Template não encontrado');
+      }
+
+      const { project, tasks } = createProjectFromTemplate(template, projectName, client);
+      
+      // Criar o projeto
+      await get().addProject(project);
+      
+      // Buscar o projeto recém-criado para obter o ID
+      const { projects } = get();
+      const newProject = projects.find(p => p.name === projectName);
+      
+      if (newProject) {
+        // Criar as tarefas do template
+        for (const task of tasks) {
+          await get().addBoardActivity(task.title, {
+            ...task,
+            projectId: newProject.id,
+          });
+        }
+      }
+
+      console.log('Projeto criado a partir do template com sucesso');
+    } catch (error) {
+      console.error('Erro ao criar projeto a partir do template:', error);
+      set({ error: 'Erro ao criar projeto a partir do template' });
+    }
+  },
+
+  duplicateBoardActivity: async (id: string) => {
+    try {
+      const { boardActivities } = get();
+      const originalActivity = boardActivities.find(a => a.id === id);
+      
+      if (!originalActivity) {
+        throw new Error('Atividade não encontrada');
+      }
+
+      // Criar cópia da atividade
+      const duplicatedActivity = {
+        title: `${originalActivity.title} (Cópia)`,
+        status: 'backlog' as const,
+        assigneeId: originalActivity.assigneeId,
+        description: originalActivity.description,
+        client: originalActivity.client,
+        projectId: originalActivity.projectId,
+        subtasks: originalActivity.subtasks ? [...originalActivity.subtasks] : undefined,
+      };
+
+      await get().addBoardActivity(duplicatedActivity.title, duplicatedActivity);
+      console.log('Card duplicado com sucesso');
+    } catch (error) {
+      console.error('Erro ao duplicar card:', error);
+      set({ error: 'Erro ao duplicar card' });
+    }
   },
 }));
-
-export function getState() { 
-  return useAppStore.getState(); 
-}
-
-export {};

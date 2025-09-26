@@ -317,6 +317,8 @@
     "prebuild": "rimraf app/page.jsx",
     "dev": "next dev --turbopack",
     "build": "next build",
+    "prepare-static": "node scripts/prepare-static.js",
+    "export": "next export",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useAppStore, BoardActivity } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
 import ProjectModal from './ProjectModal';
+import DataSync from './DataSync';
 
 const COLUMNS: { key: BoardActivity['status']; title: string }[] = [
   { key: 'backlog', title: 'Backlog' },
@@ -22,12 +23,16 @@ const COLUMNS: { key: BoardActivity['status']; title: string }[] = [
 // }
 
 export default function Board() {
-  const activities = useAppStore((s) => s.boardActivities);
-  const updateActivity = useAppStore((s) => s.updateBoardActivity);
-  const add = useAppStore((s) => s.addBoardActivity);
-  const del = useAppStore((s) => s.deleteBoardActivity);
-  const collaborators = useAppStore((s) => s.collaborators);
-  const projects = useAppStore((s) => s.projects);
+  const { boardActivities, collaborators, projects, addBoardActivity, updateBoardActivity, deleteBoardActivity } = useAppStore(s => ({
+    boardActivities: s.boardActivities,
+    collaborators: s.collaborators,
+    projects: s.projects,
+    addBoardActivity: s.addBoardActivity,
+    updateBoardActivity: s.updateBoardActivity,
+    deleteBoardActivity: s.deleteBoardActivity,
+  }));
+
+  const [clientFilter, setClientFilter] = useState<string>('');
 
   // Modal de projeto
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -35,7 +40,6 @@ export default function Board() {
   // Novo card
   const [openNew, setOpenNew] = useState(false);
   const [title, setTitle] = useState('');
-  const [points, setPoints] = useState<number | ''>('');
   const [assigneeId, setAssigneeId] = useState<string>('');
   const [client, setClient] = useState('');
   const [projectId, setProjectId] = useState<string>('');
@@ -44,7 +48,6 @@ export default function Board() {
   // Modal de edição
   const [editingCard, setEditingCard] = useState<BoardActivity | null>(null);
   const [editTitle, setEditTitle] = useState('');
-  const [editPoints, setEditPoints] = useState<number | ''>('');
   const [editAssigneeId, setEditAssigneeId] = useState<string>('');
   const [editClient, setEditClient] = useState('');
   const [editProjectId, setEditProjectId] = useState<string>('');
@@ -71,9 +74,8 @@ export default function Board() {
   const onAdd = () => {
     if (!canAdd) return;
     const validSubtasks = subtasks.filter(s => s.trim().length > 0);
-    add(title.trim(), {
+    addBoardActivity(title.trim(), {
       status: 'backlog',
-      points: typeof points === 'number' ? points : undefined,
       assigneeId: assigneeId || undefined,
       client: client || undefined,
       projectId: projectId || undefined,
@@ -81,7 +83,6 @@ export default function Board() {
     });
     toast.success('Tarefa adicionada com sucesso!');
     setTitle('');
-    setPoints('');
     setAssigneeId('');
     setClient('');
     setProjectId('');
@@ -92,7 +93,6 @@ export default function Board() {
   const openEditModal = (card: BoardActivity) => {
     setEditingCard(card);
     setEditTitle(card.title);
-    setEditPoints(card.points || '');
     setEditAssigneeId(card.assigneeId || '');
     setEditClient(card.client || '');
     setEditProjectId(card.projectId || '');
@@ -102,7 +102,6 @@ export default function Board() {
   const closeEditModal = () => {
     setEditingCard(null);
     setEditTitle('');
-    setEditPoints('');
     setEditAssigneeId('');
     setEditClient('');
     setEditProjectId('');
@@ -112,9 +111,8 @@ export default function Board() {
   const saveEdit = () => {
     if (!editingCard || !editTitle.trim()) return;
     const validSubtasks = editSubtasks.filter(s => s.trim().length > 0);
-    updateActivity(editingCard.id, {
+    updateBoardActivity(editingCard.id, {
       title: editTitle.trim(),
-      points: typeof editPoints === 'number' ? editPoints : undefined,
       assigneeId: editAssigneeId || undefined,
       client: editClient || undefined,
       projectId: editProjectId || undefined,
@@ -134,29 +132,88 @@ export default function Board() {
   const onDrop = (e: React.DragEvent, status: BoardActivity['status']) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('text/plain');
-    updateActivity(id, { status });
+    updateBoardActivity(id, { status });
     toast.success(`Tarefa movida para ${COLUMNS.find(c => c.key === status)?.title}`);
   };
 
+  // Filtrar atividades por cliente
+  const filteredActivities = useMemo(() => {
+    if (!clientFilter) return boardActivities;
+    return boardActivities.filter(activity => 
+      activity.client?.toLowerCase().includes(clientFilter.toLowerCase()) ||
+      (!activity.client && clientFilter === 'sem-cliente')
+    );
+  }, [boardActivities, clientFilter]);
+
+  // Obter lista única de clientes
+  const availableClients = useMemo(() => {
+    const clients = new Set<string>();
+    boardActivities.forEach(activity => {
+      if (activity.client) {
+        clients.add(activity.client);
+      }
+    });
+    return Array.from(clients).sort();
+  }, [boardActivities]);
+
   const byCol = useMemo(() => {
-    const map: Record<BoardActivity['status'], typeof activities> = {
+    const map: Record<BoardActivity['status'], BoardActivity[]> = {
       backlog: [],
       todo: [],
       doing: [],
       done: [],
       historical: [],
     };
-    for (const a of activities) map[a.status].push(a);
+    for (const a of filteredActivities) map[a.status].push(a);
     return map;
-  }, [activities]);
+  }, [filteredActivities]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center">
-        <div className="text-sm text-gray-600">
-          Arraste as cartas entre colunas para mudar o status.
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-600">
+            Arraste as cartas entre colunas para mudar o status.
+          </div>
+          
+          {/* Filtro por Cliente */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Filtrar por cliente:</label>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="border rounded-lg px-3 py-1 text-sm"
+            >
+              <option value="">Todos os clientes</option>
+              {availableClients.map(client => (
+                <option key={client} value={client}>
+                  {client}
+                </option>
+              ))}
+              <option value="sem-cliente">Sem cliente</option>
+            </select>
+            
+            {clientFilter && (
+              <button
+                onClick={() => setClientFilter('')}
+                className="text-xs text-gray-500 hover:text-gray-700"
+                title="Limpar filtro"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          
+          {/* Indicador de filtro ativo */}
+          {clientFilter && (
+            <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              Filtrado: {clientFilter === 'sem-cliente' ? 'Sem cliente' : clientFilter}
+              ({filteredActivities.length} tarefa{filteredActivities.length !== 1 ? 's' : ''})
+            </div>
+          )}
         </div>
-        <div className="ml-auto flex gap-2">
+        
+        <div className="flex gap-2">
           <button
             className="px-3 py-2 rounded-xl border border-blue-500 text-blue-500 hover:bg-blue-50"
             onClick={() => setShowProjectModal(true)}
@@ -194,16 +251,6 @@ export default function Board() {
                 }
               }}
             />
-            <div className="flex gap-3">
-              <input
-                className="w-24 border rounded-xl p-2"
-                type="number"
-                min={0}
-                placeholder="pts"
-                value={points}
-                onChange={(e) => setPoints(e.target.value === '' ? '' : Number(e.target.value))}
-              />
-            </div>
             <select
               className="border rounded-xl p-2"
               value={assigneeId}
@@ -325,11 +372,6 @@ export default function Board() {
                       )}
                       <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
                         {owner && <span>{owner.name}</span>}
-                        {typeof a.points === 'number' && (
-                          <span className="px-2 py-1 rounded-full bg-gray-100">
-                            {a.points} pts
-                          </span>
-                        )}
                         <button
                           onClick={() => openEditModal(a)}
                           className="ml-auto px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"
@@ -340,7 +382,7 @@ export default function Board() {
                           className="ml-1 px-2 py-1 rounded-lg border text-gray-600 hover:bg-gray-50"
                           title="Remover"
                           onClick={() => {
-                            del(a.id);
+                            deleteBoardActivity(a.id);
                             toast.success('Tarefa removida');
                           }}
                         >
@@ -359,9 +401,7 @@ export default function Board() {
         })}
       </div>
 
-      <div className="text-xs text-gray-600">
-        MVP local-first: dados salvos no seu navegador. Use Exportar para backup/compartilhar.
-      </div>
+      <DataSync />
 
       {/* Modal de Edição */}
       {editingCard && (
@@ -382,16 +422,6 @@ export default function Board() {
                 value={editClient}
                 onChange={(e) => setEditClient(e.target.value)}
               />
-              <div className="flex gap-3">
-                <input
-                  className="w-24 border rounded-xl p-2"
-                  type="number"
-                  min={0}
-                  placeholder="pts"
-                  value={editPoints}
-                  onChange={(e) => setEditPoints(e.target.value === '' ? '' : Number(e.target.value))}
-                />
-              </div>
               <select
                 className="border rounded-xl p-2"
                 value={editAssigneeId}

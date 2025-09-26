@@ -36,7 +36,7 @@ function getStatusColor(status: Project['status']): string {
 }
 
 function getTypeColor(type: Project['type']): string {
-  return type === 'tech_implementation' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+  return type === 'tech' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
 }
 
 export default function ProjectTimeline() {
@@ -240,7 +240,7 @@ export default function ProjectTimeline() {
                   <div className="text-xs text-gray-600">{project.client}</div>
                   <div className="flex gap-1 mt-1">
                     <span className={`px-2 py-0.5 rounded text-xs ${getTypeColor(project.type)}`}>
-                      {project.type === 'tech_implementation' ? 'Tech' : 'Growth'}
+                      {project.type === 'tech' ? 'Tech' : 'Growth'}
                     </span>
                     {project.teamSize > 0 && (
                       <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
