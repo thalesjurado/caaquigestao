@@ -57,6 +57,10 @@ export interface SupabaseCollaborator {
   email: string
   role: string
   avatar?: string
+  // Campos extras persistidos pela aplicação
+  hourly_rate?: number
+  access_level?: 'operations' | 'management' | 'executive' | string
+  position?: string
   created_at?: string
   updated_at?: string
 }
