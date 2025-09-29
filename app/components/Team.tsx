@@ -169,6 +169,8 @@ export default function Team() {
   const cols = useAppStore((s) => s.collaborators);
   const add = useAppStore((s) => s.addCollaborator);
   const okrs = useAppStore((s) => s.okrs);
+  const loadAllData = useAppStore((s) => s.loadAllData);
+  const setCollaborators = useAppStore((s) => s.setCollaborators);
 
   const counts = useAssigneeCounts(okrs);
 
@@ -212,8 +214,59 @@ export default function Team() {
     setHourlyRate('');
   };
 
+  const debug = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('debug'));
+  const [debugLS, setDebugLS] = useState<string>('');
+  const readLocal = () => {
+    try {
+      const v = localStorage.getItem('caaqui_collaborators');
+      setDebugLS(v || '(vazio)');
+    } catch {
+      setDebugLS('(erro ao ler localStorage)');
+    }
+  };
+  const forceLoadFromLocal = () => {
+    try {
+      const raw = localStorage.getItem('caaqui_collaborators');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const data = Array.isArray(parsed?.data) ? parsed.data : [];
+      if (Array.isArray(data)) setCollaborators(data as any);
+    } catch {}
+  };
+
   return (
     <section className="space-y-4">
+      {debug && (
+        <div className="text-xs text-gray-600 flex flex-col gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-1 rounded-full border">Total colaboradores: {cols.length}</span>
+            <button
+              className="px-2 py-1 rounded border"
+              onClick={() => loadAllData()}
+              title="Recarregar dados do armazenamento/local/Supabase"
+            >
+              Recarregar dados
+            </button>
+            <button
+              className="px-2 py-1 rounded border"
+              onClick={readLocal}
+              title="Ler localStorage (caaqui_collaborators)"
+            >
+              Ver localStorage
+            </button>
+            <button
+              className="px-2 py-1 rounded border"
+              onClick={forceLoadFromLocal}
+              title="Forçar carregar do localStorage para o estado"
+            >
+              Forçar carregar do local
+            </button>
+          </div>
+          {debugLS && (
+            <pre className="mt-1 max-h-40 overflow-auto bg-gray-50 p-2 rounded border text-[10px] whitespace-pre-wrap break-all">{debugLS}</pre>
+          )}
+        </div>
+      )}
       <header className="grid md:grid-cols-2 lg:grid-cols-4 gap-2">
         <input
           className="border rounded-xl px-3 py-2"

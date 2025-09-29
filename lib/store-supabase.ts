@@ -88,8 +88,10 @@ const convertFromSupabase = {
     email: item.email,
     role: item.role,
     avatar: item.avatar,
-    accessLevel: 'operations', // Default para compatibilidade
-    position: item.role || 'Membro', // Usar role como position por padrão
+    // Mapear os novos campos persistidos no Supabase
+    hourlyRate: (item as any).hourly_rate,
+    accessLevel: ((item as any).access_level as any) || 'operations',
+    position: (item as any).position || item.role || 'Membro',
   }),
 
   okr: (item: SupabaseOKR): OKR => ({
@@ -154,6 +156,10 @@ const convertToSupabase = {
     email: item.email,
     role: item.role,
     avatar: item.avatar,
+    // Persistir campos extras
+    hourly_rate: item.hourlyRate as any,
+    access_level: item.accessLevel as any,
+    position: item.position as any,
   }),
 
   okr: (item: Partial<OKR>): Partial<SupabaseOKR> => ({
@@ -225,6 +231,8 @@ interface AppActions {
   addCollaborator: (collaborator: Omit<Collaborator, 'id'>) => Promise<void>;
   updateCollaborator: (id: string, patch: Partial<Collaborator>) => Promise<void>;
   deleteCollaborator: (id: string) => Promise<void>;
+  // Debug/utility
+  setCollaborators: (list: Collaborator[]) => void;
   
   // OKRs
   addOKR: (okr: Omit<OKR, 'id'>) => Promise<void>;
@@ -276,6 +284,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Loading & Error
   setLoading: (loading) => set({ isLoading: loading }),
   setError: (error) => set({ error }),
+  setCollaborators: (list) => set({ collaborators: list }),
 
   // Initialize data from Supabase
   loadAllData: async () => {
@@ -288,9 +297,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         initializeFallbackData();
       }
       
-      const connectionOk = await testConnection();
+      const connectionOk = await testConnection().catch(() => false);
       if (!connectionOk) {
-        throw new Error('Falha na conexão com Supabase');
+        console.warn('⚠️ Supabase indisponível. Carregando dados do localStorage/fallback.');
       }
 
       const [boardActivities, collaborators, okrs, rituals, projects, projectAllocations] = await Promise.all([
@@ -320,10 +329,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         }),
       ]);
 
-      // Se projects, projectAllocations ou boardActivities estão vazios, tenta carregar do localStorage
+      // Se collaborators, projects, projectAllocations ou boardActivities estão vazios, tenta carregar do localStorage
       let finalProjects = projects;
       let finalProjectAllocations = projectAllocations;
       let finalBoardActivities = boardActivities;
+      let finalCollaborators = collaborators;
 
       if (projects.length === 0) {
         try {
@@ -380,9 +390,33 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         }
       }
 
+      if (collaborators.length === 0) {
+        try {
+          const localCollaborators = loadFromStorage(STORAGE_KEYS.COLLABORATORS);
+          if (localCollaborators.length > 0) {
+            // Se vierem no formato local, apenas usa; se vierem no formato do Supabase, converte
+            const hasLocalShape = !!(localCollaborators[0] as any)?.accessLevel || !!(localCollaborators[0] as any)?.position;
+            finalCollaborators = hasLocalShape
+              ? (localCollaborators as any)
+              : (localCollaborators as any).map(convertFromSupabase.collaborator);
+            console.log('📦 Carregando collaborators do localStorage:', finalCollaborators.length);
+          }
+        } catch (err) {
+          console.warn('Erro ao carregar collaborators do localStorage:', err);
+        }
+      }
+
+      const existingCols = get().collaborators || [];
+      const loadedCols = finalCollaborators.length > 0
+        ? ((finalCollaborators[0] as any)?.accessLevel || (finalCollaborators[0] as any)?.position
+            ? finalCollaborators as any
+            : finalCollaborators.map(convertFromSupabase.collaborator))
+        : [];
+
       set({
         boardActivities: finalBoardActivities.length > 0 ? (finalBoardActivities[0]?.id ? finalBoardActivities.map(convertFromSupabase.boardActivity) : finalBoardActivities) : [],
-        collaborators: collaborators.map(convertFromSupabase.collaborator),
+        // Se já existe algo no estado (ex: adição otimista), não sobrescreve com carregamento
+        collaborators: existingCols.length > 0 ? existingCols : loadedCols,
         okrs: okrs.map(convertFromSupabase.okr),
         rituals: rituals.map(convertFromSupabase.ritual),
         projects: finalProjects.length > 0 ? (finalProjects[0]?.id ? finalProjects.map(convertFromSupabase.project) : finalProjects) : [],
@@ -511,13 +545,33 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         id: uid(),
         ...collaborator,
       };
-
-      const created = await collaboratorsAPI.create(newCollaborator);
-      const converted = convertFromSupabase.collaborator(created);
-      
+      // Otimista: adiciona no estado imediatamente para refletir na UI
       set((state) => ({
-        collaborators: [...state.collaborators, converted]
+        collaborators: [...state.collaborators, newCollaborator]
       }));
+      console.log('👥 [addCollaborator] Otimista ->', newCollaborator);
+      // Também persiste imediatamente no localStorage para evitar "race" com loadAllData
+      try {
+        const currentImmediate = loadFromStorage(STORAGE_KEYS.COLLABORATORS) as any[];
+        currentImmediate.push(newCollaborator);
+        saveToStorage(STORAGE_KEYS.COLLABORATORS, currentImmediate);
+      } catch {}
+      try {
+        const toSupabase = convertToSupabase.collaborator(newCollaborator);
+        const created = await collaboratorsAPI.create(toSupabase as any);
+        const converted = convertFromSupabase.collaborator(created);
+        set((state) => ({
+          collaborators: state.collaborators.map(c => c.id === newCollaborator.id ? { ...c, ...converted } : c)
+        }));
+        console.log('👥 [addCollaborator] Persistido no Supabase, convertido ->', converted);
+      } catch (e) {
+        console.warn('⚠️ Erro ao criar colaborador no Supabase, usando localStorage');
+        // Fallback: salvar no localStorage e atualizar estado imediatamente
+        const current = loadFromStorage(STORAGE_KEYS.COLLABORATORS) as any[];
+        current.push(newCollaborator);
+        saveToStorage(STORAGE_KEYS.COLLABORATORS, current);
+        console.log('💾 [addCollaborator] Salvo no localStorage. Total local ->', current.length);
+      }
     } catch (error) {
       console.error('Erro ao adicionar colaborador:', error);
       set({ error: 'Erro ao adicionar colaborador' });
@@ -526,15 +580,26 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   updateCollaborator: async (id, patch) => {
     try {
-      const supabasePatch = convertToSupabase.collaborator(patch);
-      const updated = await collaboratorsAPI.update(id, supabasePatch);
-      const converted = convertFromSupabase.collaborator(updated);
-      
-      set((state) => ({
-        collaborators: state.collaborators.map(c => 
-          c.id === id ? { ...c, ...converted } : c
-        )
-      }));
+      try {
+        const supabasePatch = convertToSupabase.collaborator(patch);
+        const updated = await collaboratorsAPI.update(id, supabasePatch);
+        const converted = convertFromSupabase.collaborator(updated);
+        set((state) => ({
+          collaborators: state.collaborators.map(c => 
+            c.id === id ? { ...c, ...converted } : c
+          )
+        }));
+      } catch (e) {
+        console.warn('⚠️ Erro ao atualizar colaborador no Supabase, usando localStorage');
+        const updatedLocal = { ...patch, id } as any;
+        set((state) => ({
+          collaborators: state.collaborators.map(c => c.id === id ? { ...c, ...updatedLocal } : c)
+        }));
+        // Persistir no localStorage
+        const current = loadFromStorage(STORAGE_KEYS.COLLABORATORS) as any[];
+        const next = current.length > 0 ? current.map((c:any) => c.id === id ? { ...c, ...updatedLocal } : c) : [];
+        if (next.length > 0) saveToStorage(STORAGE_KEYS.COLLABORATORS, next);
+      }
     } catch (error) {
       console.error('Erro ao atualizar colaborador:', error);
       set({ error: 'Erro ao atualizar colaborador' });
@@ -543,7 +608,14 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   deleteCollaborator: async (id) => {
     try {
-      await collaboratorsAPI.delete(id);
+      try {
+        await collaboratorsAPI.delete(id);
+      } catch (e) {
+        console.warn('⚠️ Erro ao deletar colaborador no Supabase, usando localStorage');
+        const current = loadFromStorage(STORAGE_KEYS.COLLABORATORS) as any[];
+        const next = current.filter((c:any) => c.id !== id);
+        if (current.length !== next.length) saveToStorage(STORAGE_KEYS.COLLABORATORS, next);
+      }
       set((state) => ({
         collaborators: state.collaborators.filter(c => c.id !== id)
       }));
