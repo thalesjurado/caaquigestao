@@ -1,7 +1,7 @@
 // app/components/Team.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAppStore, Collaborator, OKR } from '../../lib/store-supabase';
 import { toast } from '../../lib/toast';
 import { 
@@ -233,6 +233,14 @@ export default function Team() {
       if (Array.isArray(data)) setCollaborators(data as any);
     } catch {}
   };
+
+  // Auto-hidratacao: se após o carregamento global a lista estiver vazia, tenta popular do localStorage
+  useEffect(() => {
+    if (cols.length === 0) {
+      forceLoadFromLocal();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cols.length]);
 
   return (
     <section className="space-y-4">
