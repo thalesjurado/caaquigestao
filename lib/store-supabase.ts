@@ -440,6 +440,21 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         projectAllocations: finalProjectAllocations.length > 0 ? (finalProjectAllocations[0]?.id ? finalProjectAllocations.map(convertFromSupabase.projectAllocation) : finalProjectAllocations) : [],
         isLoading: false,
       });
+
+      // Salvaguarda: se ainda ficou vazio (ex: Supabase vazio e sem merge), tenta localStorage cru
+      if (mergedCollaborators.length === 0) {
+        try {
+          const raw = localStorage.getItem('caaqui_collaborators');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const data = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed) ? parsed : [];
+            if (data.length > 0) {
+              set({ collaborators: data });
+              saveToStorage(STORAGE_KEYS.COLLABORATORS, data);
+            }
+          }
+        } catch {}
+      }
     } catch (error) {
       console.error('Erro geral ao carregar dados:', error);
       set({ 
@@ -581,6 +596,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           collaborators: state.collaborators.map(c => c.id === newCollaborator.id ? { ...c, ...converted } : c)
         }));
         console.log('👥 [addCollaborator] Persistido no Supabase, convertido ->', converted);
+        // Persiste estado atualizado no localStorage
+        try {
+          const current = get().collaborators;
+          saveToStorage(STORAGE_KEYS.COLLABORATORS, current);
+        } catch {}
       } catch (e) {
         console.warn('⚠️ Erro ao criar colaborador no Supabase, usando localStorage');
         // Fallback: salvar no localStorage e atualizar estado imediatamente
@@ -606,6 +626,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             c.id === id ? { ...c, ...converted } : c
           )
         }));
+        // Persistir também no localStorage em caso de sucesso remoto
+        try {
+          const current = get().collaborators;
+          saveToStorage(STORAGE_KEYS.COLLABORATORS, current);
+        } catch {}
       } catch (e) {
         console.warn('⚠️ Erro ao atualizar colaborador no Supabase, usando localStorage');
         const updatedLocal = { ...patch, id } as any;
@@ -636,6 +661,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       set((state) => ({
         collaborators: state.collaborators.filter(c => c.id !== id)
       }));
+      // Atualiza localStorage também após sucesso
+      try {
+        const current = get().collaborators;
+        saveToStorage(STORAGE_KEYS.COLLABORATORS, current);
+      } catch {}
     } catch (error) {
       console.error('Erro ao deletar colaborador:', error);
       set({ error: 'Erro ao deletar colaborador' });
