@@ -45,6 +45,8 @@ export const POSITION_TO_ACCESS_LEVEL: Record<string, AccessLevel> = {
   'Analista': 'operations',
   'Estagiário': 'operations',
   'Junior': 'operations',
+  'QA': 'operations',
+  'Especialista': 'operations',
   
   // Management
   'Tech Lead': 'management',
@@ -52,6 +54,7 @@ export const POSITION_TO_ACCESS_LEVEL: Record<string, AccessLevel> = {
   'Head': 'management',
   'Coordenador': 'management',
   'Senior': 'management',
+  'CSM': 'management',
   
   // Executive
   'Sócio': 'executive',
@@ -110,6 +113,9 @@ export const SUGGESTED_POSITIONS = [
   'Designer Senior',
   'Analista',
   'Analista Senior',
+  'QA',
+  'CSM',
+  'Especialista',
   'Gerente',
   'Head de Tecnologia',
   'Head de Growth',

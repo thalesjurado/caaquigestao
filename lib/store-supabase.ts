@@ -413,10 +413,27 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             : finalCollaborators.map(convertFromSupabase.collaborator))
         : [];
 
+      // Merge seguro: prioriza dados vindos do Supabase quando existem, mantendo locais
+      const mergeCollaborators = () => {
+        const byKey = new Map<string, any>();
+        const keyFor = (c: any) => c.id || c.email || `${c.name}:${c.position || ''}`;
+        // 1) existentes no estado (otimistas)
+        for (const c of existingCols) byKey.set(keyFor(c), c);
+        // 2) locais
+        for (const c of loadedCols) byKey.set(keyFor(c), { ...(byKey.get(keyFor(c)) || {}), ...c });
+        return Array.from(byKey.values());
+      };
+
+      const mergedCollaborators = mergeCollaborators();
+
+      // Persistir imediatamente no localStorage para garantir sobrevivência a reload
+      try {
+        saveToStorage(STORAGE_KEYS.COLLABORATORS, mergedCollaborators);
+      } catch {}
+
       set({
         boardActivities: finalBoardActivities.length > 0 ? (finalBoardActivities[0]?.id ? finalBoardActivities.map(convertFromSupabase.boardActivity) : finalBoardActivities) : [],
-        // Se já existe algo no estado (ex: adição otimista), não sobrescreve com carregamento
-        collaborators: existingCols.length > 0 ? existingCols : loadedCols,
+        collaborators: mergedCollaborators,
         okrs: okrs.map(convertFromSupabase.okr),
         rituals: rituals.map(convertFromSupabase.ritual),
         projects: finalProjects.length > 0 ? (finalProjects[0]?.id ? finalProjects.map(convertFromSupabase.project) : finalProjects) : [],

@@ -215,11 +215,14 @@ export default function Dashboard() {
             const { projectAllocations } = useAppStore.getState();
             const now = new Date();
             
-            const activeAllocations = projectAllocations.filter(a => 
-              a.collaboratorId === c.id && 
-              new Date(a.endDate) > now &&
-              new Date(a.startDate) <= now
-            );
+            const activeAllocations = projectAllocations.filter(a => {
+              if (a.collaboratorId !== c.id) return false;
+              const endOk = new Date(a.endDate) > now;
+              const startOk = new Date(a.startDate) <= now;
+              const project = projects.find(p => p.id === a.projectId);
+              const projectOk = !!project && project.status !== 'archived' && project.status !== 'cancelled';
+              return endOk && startOk && projectOk;
+            });
             
             const totalAllocation = activeAllocations.reduce((sum, a) => sum + a.percentage, 0);
             const simultaneousProjects = activeAllocations.length;
@@ -270,9 +273,10 @@ export default function Dashboard() {
                   <div className="mt-2 space-y-1">
                     {activeAllocations.map(allocation => {
                       const project = projects.find(p => p.id === allocation.projectId);
+                      if (!project || project.status === 'archived' || project.status === 'cancelled') return null;
                       return (
                         <div key={allocation.id} className="flex justify-between text-xs text-gray-600">
-                          <span>{project?.name || 'Projeto não encontrado'}</span>
+                          <span>{project.name}</span>
                           <span>{allocation.percentage}%</span>
                         </div>
                       );
