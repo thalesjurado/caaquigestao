@@ -270,10 +270,24 @@ interface AppActions {
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
+// Hidratar colaboradores do localStorage logo no início (sincrono)
+const initialCollaborators: Collaborator[] = (() => {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = localStorage.getItem('caaqui_collaborators');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const data = Array.isArray(parsed?.data) ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+    return (data || []) as Collaborator[];
+  } catch {
+    return [];
+  }
+})();
+
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Estado inicial
   boardActivities: [],
-  collaborators: [],
+  collaborators: initialCollaborators,
   okrs: [],
   rituals: [],
   projects: [],
