@@ -854,21 +854,45 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   deleteProject: async (id) => {
     try {
-      // Tenta deletar no Supabase primeiro
+      // 1) Remover alocações relacionadas (Supabase + local)
+      try {
+        const related = (await projectAllocationsAPI.getByProject(id)).map((a: any) => a.id);
+        for (const allocId of related) {
+          try { await projectAllocationsAPI.delete(allocId); } catch {}
+        }
+      } catch {
+        // Fallback local
+        const localAllocs = JSON.parse(localStorage.getItem('caaqui_project_allocations') || '[]');
+        const filtered = localAllocs.filter((a: { project_id?: string; projectId?: string }) => (a.project_id || a.projectId) !== id);
+        localStorage.setItem('caaqui_project_allocations', JSON.stringify(filtered));
+      }
+
+      // 2) Remover cards (board_activities) vinculados ao projeto no Supabase/local
+      try {
+        const current = get().boardActivities;
+        const toDelete = current.filter(b => b.projectId === id);
+        for (const b of toDelete) {
+          try { await boardActivitiesAPI.delete(b.id); } catch {}
+        }
+        set((state) => ({
+          boardActivities: state.boardActivities.filter(b => b.projectId !== id)
+        }));
+      } catch {}
+
+      // 3) Remover o projeto em si (Supabase + local)
       try {
         await projectsAPI.delete(id);
       } catch {
         console.warn('⚠️ Erro ao deletar no Supabase, usando localStorage');
-        
-        // Fallback: remove do localStorage
         const localProjects = JSON.parse(localStorage.getItem('caaqui_projects') || '[]');
         const filteredProjects = localProjects.filter((p: { id: string }) => p.id !== id);
         localStorage.setItem('caaqui_projects', JSON.stringify(filteredProjects));
       }
-      
-      // Remove do estado local sempre
+
+      // 4) Remover do estado local: projeto e alocações relacionadas
       set((state) => ({
-        projects: state.projects.filter(p => p.id !== id)
+        projects: state.projects.filter(p => p.id !== id),
+        projectAllocations: state.projectAllocations.filter(a => a.projectId !== id),
       }));
     } catch (error) {
       console.error('Erro ao deletar projeto:', error);
@@ -1003,8 +1027,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       });
       
       const activeAllocations = allAllocationsForUser.filter(a => {
-        const isActive = new Date(a.endDate) > now;
-        return isActive;
+        const project = state.projects.find(p => p.id === a.projectId);
+        const notArchived = project && project.status !== 'archived' && project.status !== 'cancelled';
+        const isActiveByDate = new Date(a.endDate) > now;
+        return Boolean(project) && notArchived && isActiveByDate;
       });
       
       const totalAllocation = activeAllocations.reduce((sum, a) => sum + a.percentage, 0);
@@ -1038,7 +1064,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     
     return projects.map(project => {
       const allocations = projectAllocations.filter(a => a.projectId === project.id);
-      const totalAllocation = allocations.reduce((sum, a) => a.percentage, 0);
+      const totalAllocation = allocations.reduce((sum, a) => sum + a.percentage, 0);
       
       // Calcular custo real baseado no valor/hora dos colaboradores
       const realCost = allocations.reduce((sum, allocation) => {
