@@ -157,7 +157,14 @@ const setupRealtime = (get: () => AppState & AppActions, set: (fn: any) => void)
       if (table === 'projects') {
         if (event === 'INSERT') {
           const proj = convertFromSupabase.project(newRow);
-          set((state: any) => ({ projects: [...state.projects, proj] }));
+          set((state: any) => {
+            const exists = state.projects.some((p: any) => p.id === proj.id);
+            return {
+              projects: exists
+                ? state.projects.map((p: any) => p.id === proj.id ? { ...p, ...proj } : p)
+                : [...state.projects, proj],
+            };
+          });
         } else if (event === 'UPDATE') {
           const proj = convertFromSupabase.project(newRow);
           set((state: any) => ({ projects: state.projects.map((p: any) => p.id === proj.id ? { ...p, ...proj } : p) }));
@@ -170,7 +177,14 @@ const setupRealtime = (get: () => AppState & AppActions, set: (fn: any) => void)
       if (table === 'project_allocations') {
         if (event === 'INSERT') {
           const alloc = convertFromSupabase.projectAllocation(newRow);
-          set((state: any) => ({ projectAllocations: [...state.projectAllocations, alloc] }));
+          set((state: any) => {
+            const exists = state.projectAllocations.some((a: any) => a.id === alloc.id);
+            return {
+              projectAllocations: exists
+                ? state.projectAllocations.map((a: any) => a.id === alloc.id ? { ...a, ...alloc } : a)
+                : [...state.projectAllocations, alloc],
+            };
+          });
         } else if (event === 'UPDATE') {
           const alloc = convertFromSupabase.projectAllocation(newRow);
           set((state: any) => ({ projectAllocations: state.projectAllocations.map((a: any) => a.id === alloc.id ? { ...a, ...alloc } : a) }));
@@ -183,7 +197,14 @@ const setupRealtime = (get: () => AppState & AppActions, set: (fn: any) => void)
       if (table === 'board_activities') {
         if (event === 'INSERT') {
           const act = convertFromSupabase.boardActivity(newRow);
-          set((state: any) => ({ boardActivities: [...state.boardActivities, act] }));
+          set((state: any) => {
+            const exists = state.boardActivities.some((b: any) => b.id === act.id);
+            return {
+              boardActivities: exists
+                ? state.boardActivities.map((b: any) => b.id === act.id ? { ...b, ...act } : b)
+                : [...state.boardActivities, act],
+            };
+          });
         } else if (event === 'UPDATE') {
           const act = convertFromSupabase.boardActivity(newRow);
           set((state: any) => ({ boardActivities: state.boardActivities.map((b: any) => b.id === act.id ? { ...b, ...act } : b) }));
@@ -196,7 +217,14 @@ const setupRealtime = (get: () => AppState & AppActions, set: (fn: any) => void)
       if (table === 'rituals') {
         if (event === 'INSERT') {
           const r = convertFromSupabase.ritual(newRow);
-          set((state: any) => ({ rituals: [...state.rituals, r] }));
+          set((state: any) => {
+            const exists = state.rituals.some((x: any) => x.id === r.id);
+            return {
+              rituals: exists
+                ? state.rituals.map((x: any) => x.id === r.id ? { ...x, ...r } : x)
+                : [...state.rituals, r],
+            };
+          });
         } else if (event === 'UPDATE') {
           const r = convertFromSupabase.ritual(newRow);
           set((state: any) => ({ rituals: state.rituals.map((x: any) => x.id === r.id ? { ...x, ...r } : x) }));
@@ -209,7 +237,14 @@ const setupRealtime = (get: () => AppState & AppActions, set: (fn: any) => void)
       if (table === 'collaborators') {
         if (event === 'INSERT') {
           const c = convertFromSupabase.collaborator(newRow);
-          set((state: any) => ({ collaborators: [...state.collaborators, c] }));
+          set((state: any) => {
+            const exists = state.collaborators.some((x: any) => x.id === c.id);
+            return {
+              collaborators: exists
+                ? state.collaborators.map((x: any) => x.id === c.id ? { ...x, ...c } : x)
+                : [...state.collaborators, c],
+            };
+          });
         } else if (event === 'UPDATE') {
           const c = convertFromSupabase.collaborator(newRow);
           set((state: any) => ({ collaborators: state.collaborators.map((x: any) => x.id === c.id ? { ...x, ...c } : x) }));
