@@ -117,10 +117,15 @@ export default function Projects() {
     const groups = new Map<string, Project[]>();
     filteredProjects.forEach(project => {
       const client = project.client;
+      if (!client) return;
       if (!groups.has(client)) {
         groups.set(client, []);
       }
-      groups.get(client)!.push(project);
+      const list = groups.get(client) ?? [];
+      if (!groups.has(client)) {
+        groups.set(client, list);
+      }
+      list.push(project);
     });
     return Array.from(groups.entries()).map(([client, projects]) => ({
       client,

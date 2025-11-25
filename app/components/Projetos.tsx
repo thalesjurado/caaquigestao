@@ -9,13 +9,17 @@ export default function Projetos() {
 
   const projectsByClient = useMemo(() => {
     const projects = new Map<string, typeof boardActivities>();
-    
+
     boardActivities.forEach(activity => {
       const clientName = activity.client?.trim() || 'Sem Cliente';
       if (!projects.has(clientName)) {
         projects.set(clientName, []);
       }
-      projects.get(clientName)!.push(activity);
+      const list = projects.get(clientName) ?? [];
+      if (!projects.has(clientName)) {
+        projects.set(clientName, list);
+      }
+      list.push(activity);
     });
 
     // Ordenar por cliente
