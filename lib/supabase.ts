@@ -4,33 +4,29 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ohanjvrxywgreokkeckd.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key'
 
-// Debug das variáveis de ambiente
-console.log('🔧 Supabase Config:', {
-  url: supabaseUrl,
-  hasKey: !!supabaseAnonKey && supabaseAnonKey !== 'your-anon-key'
-});
+// Log leve apenas para indicar modo
+const hasValidKey = !!supabaseAnonKey && supabaseAnonKey !== 'your-anon-key';
+if (!hasValidKey) {
+  console.warn('⚠️ Supabase não configurado (sem chave válida). Usando modo local.');
+}
 
 // Teste de conexão simples
 export const testConnection = async () => {
+  // Se não há chave válida, não tenta conectar; assume fallback local
+  if (!hasValidKey) {
+    return false;
+  }
   try {
-    console.log('🔍 Testando conexão com Supabase...');
-    const { data, error } = await supabase.from('board_activities').select('count', { count: 'exact' });
-    
+    const { error } = await supabase
+      .from('board_activities')
+      .select('id', { count: 'exact', head: true });
     if (error) {
-      console.error('❌ Erro na conexão:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        status: (error as { status?: string }).status || 'N/A'
-      });
+      console.warn('⚠️ Supabase indisponível. Fallback local ativado.');
       return false;
     }
-    
-    console.log('✅ Conexão OK - board_activities:', data);
     return true;
-  } catch (err) {
-    console.error('❌ Erro de conexão geral:', err);
+  } catch {
+    console.warn('⚠️ Supabase com erro de conexão. Usando modo local.');
     return false;
   }
 };
@@ -47,6 +43,8 @@ export interface SupabaseBoardActivity {
   client?: string
   points?: number
   subtasks?: string[]
+  project_id?: string
+  due_date?: string
   created_at?: string
   updated_at?: string
 }
@@ -85,6 +83,7 @@ export interface SupabaseRitual {
   content?: string
   frequency?: string
   next_date?: string
+  project_id?: string
   created_at?: string
   updated_at?: string
 }
@@ -129,13 +128,14 @@ export interface SupabaseProjectAllocation {
 // Funções para Board Activities
 export const boardActivitiesAPI = {
   async getAll() {
+    if (!hasValidKey) return [] as any[];
     const { data, error } = await supabase
       .from('board_activities')
       .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('❌ Erro detalhado boardActivities:', {
+      console.warn('⚠️ Erro detalhado boardActivities:', {
         message: error.message,
         details: error.details,
         hint: error.hint,
@@ -189,13 +189,14 @@ export const boardActivitiesAPI = {
 // Funções para Collaborators
 export const collaboratorsAPI = {
   async getAll() {
+    if (!hasValidKey) return [] as any[];
     const { data, error } = await supabase
       .from('collaborators')
       .select('*')
       .order('name', { ascending: true })
     
     if (error) {
-      console.error('❌ Erro detalhado collaborators:', error);
+      console.warn('⚠️ Erro detalhado collaborators:', error);
       throw error;
     }
     return data || []
@@ -205,11 +206,14 @@ export const collaboratorsAPI = {
     const { data, error } = await supabase
       .from('collaborators')
       .insert([{
-        ...collaborator,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        // Somente colunas reais da tabela collaborators
+        id: collaborator.id,
+        name: collaborator.name,
+        email: collaborator.email,
+        role: collaborator.role,
+        avatar: collaborator.avatar,
       }])
-      .select()
+      .select('id,name,email,role,avatar')
       .single()
     
     if (error) throw error
@@ -220,11 +224,14 @@ export const collaboratorsAPI = {
     const { data, error } = await supabase
       .from('collaborators')
       .update({
-        ...updates,
-        updated_at: new Date().toISOString()
+        // Evita colunas inexistentes
+        name: updates.name,
+        email: updates.email,
+        role: updates.role,
+        avatar: updates.avatar,
       })
       .eq('id', id)
-      .select()
+      .select('id,name,email,role,avatar')
       .single()
     
     if (error) throw error
@@ -244,13 +251,14 @@ export const collaboratorsAPI = {
 // Funções para OKRs
 export const okrsAPI = {
   async getAll() {
+    if (!hasValidKey) return [] as any[];
     const { data, error } = await supabase
       .from('okrs')
       .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('❌ Erro detalhado okrs:', error);
+      console.warn('⚠️ Erro detalhado okrs:', error);
       throw error;
     }
     return data || []
@@ -299,13 +307,14 @@ export const okrsAPI = {
 // Funções para Rituals
 export const ritualsAPI = {
   async getAll() {
+    if (!hasValidKey) return [] as any[];
     const { data, error } = await supabase
       .from('rituals')
       .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('❌ Erro detalhado rituals:', error);
+      console.warn('⚠️ Erro detalhado rituals:', error);
       throw error;
     }
     return data || []
@@ -354,6 +363,7 @@ export const ritualsAPI = {
 // Funções para Projects
 export const projectsAPI = {
   async getAll() {
+    if (!hasValidKey) return [] as any[];
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -361,7 +371,7 @@ export const projectsAPI = {
         .order('created_at', { ascending: false })
       
       if (error) {
-        console.error('❌ Erro detalhado projects:', error);
+        console.warn('⚠️ Erro detalhado projects:', error);
         
         // Se a tabela não existe, retorna array vazio para usar fallback
         if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
@@ -373,7 +383,7 @@ export const projectsAPI = {
       }
       return data || []
     } catch (err) {
-      console.error('❌ Erro ao acessar projects:', err);
+      console.warn('⚠️ Erro ao acessar projects:', err);
       return [];
     }
   },
@@ -440,6 +450,7 @@ export const projectsAPI = {
 // Funções para Project Allocations
 export const projectAllocationsAPI = {
   async getAll() {
+    if (!hasValidKey) return [] as any[];
     try {
       const { data, error } = await supabase
         .from('project_allocations')
@@ -451,7 +462,7 @@ export const projectAllocationsAPI = {
         .order('created_at', { ascending: false })
       
       if (error) {
-        console.error('❌ Erro detalhado project_allocations:', error);
+        console.warn('⚠️ Erro detalhado project_allocations:', error);
         
         // Se a tabela não existe, retorna array vazio para usar fallback
         if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
@@ -463,7 +474,7 @@ export const projectAllocationsAPI = {
       }
       return data || []
     } catch (err) {
-      console.error('❌ Erro ao acessar project_allocations:', err);
+      console.warn('⚠️ Erro ao acessar project_allocations:', err);
       return [];
     }
   },

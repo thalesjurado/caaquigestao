@@ -9,6 +9,7 @@ import {
   projectsAPI,
   projectAllocationsAPI,
   testConnection,
+  supabase,
   SupabaseBoardActivity,
   SupabaseCollaborator,
   SupabaseOKR,
@@ -66,6 +67,7 @@ export interface Ritual {
   content?: string;
   frequency?: string;
   nextDate?: Date;
+  projectId?: string;
 }
 
 // Funções de conversão entre tipos locais e Supabase
@@ -109,6 +111,7 @@ const convertFromSupabase = {
     content: item.content,
     frequency: item.frequency,
     nextDate: item.next_date ? new Date(item.next_date) : undefined,
+    projectId: (item as any).project_id,
   }),
 
   project: (item: SupabaseProject): Project => ({
@@ -138,9 +141,143 @@ const convertFromSupabase = {
   }),
 };
 
+// Realtime: garante inicialização única
+let realtimeInitialized = false;
+const setupRealtime = (get: () => AppState & AppActions, set: (fn: any) => void) => {
+  if (realtimeInitialized) return;
+  try {
+    const channel = supabase.channel('caaqui-db-changes');
+
+    const onChange = (payload: any, table: 'projects' | 'project_allocations' | 'board_activities' | 'rituals' | 'collaborators') => {
+      try { console.log('[RT]', table, payload.eventType, payload.new?.id || payload.old?.id); } catch {}
+      const event = payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE';
+      const newRow = payload.new as any;
+      const oldRow = payload.old as any;
+
+      if (table === 'projects') {
+        if (event === 'INSERT') {
+          const proj = convertFromSupabase.project(newRow);
+          set((state: any) => ({ projects: [...state.projects, proj] }));
+        } else if (event === 'UPDATE') {
+          const proj = convertFromSupabase.project(newRow);
+          set((state: any) => ({ projects: state.projects.map((p: any) => p.id === proj.id ? { ...p, ...proj } : p) }));
+        } else if (event === 'DELETE') {
+          const id = oldRow?.id;
+          if (id) set((state: any) => ({ projects: state.projects.filter((p: any) => p.id !== id) }));
+        }
+      }
+
+      if (table === 'project_allocations') {
+        if (event === 'INSERT') {
+          const alloc = convertFromSupabase.projectAllocation(newRow);
+          set((state: any) => ({ projectAllocations: [...state.projectAllocations, alloc] }));
+        } else if (event === 'UPDATE') {
+          const alloc = convertFromSupabase.projectAllocation(newRow);
+          set((state: any) => ({ projectAllocations: state.projectAllocations.map((a: any) => a.id === alloc.id ? { ...a, ...alloc } : a) }));
+        } else if (event === 'DELETE') {
+          const id = oldRow?.id;
+          if (id) set((state: any) => ({ projectAllocations: state.projectAllocations.filter((a: any) => a.id !== id) }));
+        }
+      }
+
+      if (table === 'board_activities') {
+        if (event === 'INSERT') {
+          const act = convertFromSupabase.boardActivity(newRow);
+          set((state: any) => ({ boardActivities: [...state.boardActivities, act] }));
+        } else if (event === 'UPDATE') {
+          const act = convertFromSupabase.boardActivity(newRow);
+          set((state: any) => ({ boardActivities: state.boardActivities.map((b: any) => b.id === act.id ? { ...b, ...act } : b) }));
+        } else if (event === 'DELETE') {
+          const id = oldRow?.id;
+          if (id) set((state: any) => ({ boardActivities: state.boardActivities.filter((b: any) => b.id !== id) }));
+        }
+      }
+
+      if (table === 'rituals') {
+        if (event === 'INSERT') {
+          const r = convertFromSupabase.ritual(newRow);
+          set((state: any) => ({ rituals: [...state.rituals, r] }));
+        } else if (event === 'UPDATE') {
+          const r = convertFromSupabase.ritual(newRow);
+          set((state: any) => ({ rituals: state.rituals.map((x: any) => x.id === r.id ? { ...x, ...r } : x) }));
+        } else if (event === 'DELETE') {
+          const id = oldRow?.id;
+          if (id) set((state: any) => ({ rituals: state.rituals.filter((x: any) => x.id !== id) }));
+        }
+      }
+
+      if (table === 'collaborators') {
+        if (event === 'INSERT') {
+          const c = convertFromSupabase.collaborator(newRow);
+          set((state: any) => ({ collaborators: [...state.collaborators, c] }));
+        } else if (event === 'UPDATE') {
+          const c = convertFromSupabase.collaborator(newRow);
+          set((state: any) => ({ collaborators: state.collaborators.map((x: any) => x.id === c.id ? { ...x, ...c } : x) }));
+        } else if (event === 'DELETE') {
+          const id = oldRow?.id;
+          if (id) set((state: any) => ({ collaborators: state.collaborators.filter((x: any) => x.id !== id) }));
+        }
+      }
+    };
+
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (p) => onChange(p, 'projects'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_allocations' }, (p) => onChange(p, 'project_allocations'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_activities' }, (p) => onChange(p, 'board_activities'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rituals' }, (p) => onChange(p, 'rituals'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collaborators' }, (p) => onChange(p, 'collaborators'))
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('🔔 Realtime conectado');
+          // Hidrata imediatamente dados críticos para colaboração
+          try {
+            const [freshCols, freshAlloc] = await Promise.all([
+              collaboratorsAPI.getAll().catch(() => []),
+              projectAllocationsAPI.getAll().catch(() => []),
+            ]);
+            set((state: any) => ({
+              collaborators: Array.isArray(freshCols) && freshCols.length > 0 ? freshCols.map(convertFromSupabase.collaborator) : state.collaborators,
+              projectAllocations: Array.isArray(freshAlloc) && freshAlloc.length > 0 ? freshAlloc.map(convertFromSupabase.projectAllocation) : state.projectAllocations,
+            }));
+
+            // Polling curto para abas que abriram vazias: 5s x 6
+            let attempts = 0;
+            const poll = async () => {
+              attempts++;
+              const state = get();
+              const needCols = (state.collaborators?.length || 0) === 0;
+              const needAlloc = (state.projectAllocations?.length || 0) === 0;
+              if (!needCols && !needAlloc) return; // já temos dados
+              try {
+                const [pCols, pAlloc] = await Promise.all([
+                  needCols ? collaboratorsAPI.getAll().catch(() => []) : Promise.resolve([]),
+                  needAlloc ? projectAllocationsAPI.getAll().catch(() => []) : Promise.resolve([]),
+                ]);
+                if ((pCols as any[])?.length > 0 || (pAlloc as any[])?.length > 0) {
+                  set((s: any) => ({
+                    collaborators: (pCols as any[])?.length > 0 ? (pCols as any[]).map(convertFromSupabase.collaborator) : s.collaborators,
+                    projectAllocations: (pAlloc as any[])?.length > 0 ? (pAlloc as any[]).map(convertFromSupabase.projectAllocation) : s.projectAllocations,
+                  }));
+                  return; // encerra polling após hidratar
+                }
+              } catch {}
+              if (attempts < 6) setTimeout(poll, 5000);
+            };
+            setTimeout(poll, 5000);
+          } catch (e) {
+            console.warn('⚠️ Falha ao hidratar após SUBSCRIBED:', e);
+          }
+        }
+      });
+
+    realtimeInitialized = true;
+  } catch (e) {
+    console.warn('⚠️ Falha ao iniciar Realtime:', e);
+  }
+};
+
 const convertToSupabase = {
   boardActivity: (item: Partial<BoardActivity>): Partial<SupabaseBoardActivity> => ({
-    id: item.id,
     title: item.title,
     status: item.status,
     assignee_id: item.assigneeId,
@@ -148,22 +285,20 @@ const convertToSupabase = {
     client: item.client,
     points: item.points,
     subtasks: item.subtasks,
+    project_id: item.projectId,
+    due_date: item.dueDate?.toISOString(),
   }),
 
   collaborator: (item: Partial<Collaborator>): Partial<SupabaseCollaborator> => ({
-    id: item.id,
+    // Somente colunas existentes na tabela collaborators
+    id: item.id as any,
     name: item.name,
     email: item.email,
     role: item.role,
     avatar: item.avatar,
-    // Persistir campos extras
-    hourly_rate: item.hourlyRate as any,
-    access_level: item.accessLevel as any,
-    position: item.position as any,
   }),
 
   okr: (item: Partial<OKR>): Partial<SupabaseOKR> => ({
-    id: item.id,
     title: item.title,
     description: item.description,
     progress: item.progress,
@@ -171,11 +306,11 @@ const convertToSupabase = {
   }),
 
   ritual: (item: Partial<Ritual>): Partial<SupabaseRitual> => ({
-    id: item.id,
     title: item.title,
     content: item.content,
     frequency: item.frequency,
     next_date: item.nextDate?.toISOString(),
+    project_id: item.projectId as any,
   }),
 
   project: (item: Partial<Project>): Partial<SupabaseProject> => ({
@@ -192,7 +327,6 @@ const convertToSupabase = {
   }),
 
   projectAllocation: (item: Partial<ProjectAllocation>): Partial<SupabaseProjectAllocation> => ({
-    id: item.id,
     project_id: item.projectId,
     collaborator_id: item.collaboratorId,
     percentage: item.percentage,
@@ -305,40 +439,39 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      // Inicializa dados de fallback se necessário
-      if (typeof window !== 'undefined') {
-        const { initializeFallbackData } = await import('./init-fallback-data');
-        initializeFallbackData();
-      }
-      
       const connectionOk = await testConnection().catch(() => false);
       if (!connectionOk) {
         console.warn('⚠️ Supabase indisponível. Carregando dados do localStorage/fallback.');
+        // Inicializa dados de fallback somente quando o Supabase não está disponível
+        if (typeof window !== 'undefined') {
+          const { initializeFallbackData } = await import('./init-fallback-data');
+          initializeFallbackData();
+        }
       }
 
       const [boardActivities, collaborators, okrs, rituals, projects, projectAllocations] = await Promise.all([
         boardActivitiesAPI.getAll().catch(err => {
-          console.error('Erro ao carregar boardActivities:', err);
+          console.warn('Aviso ao carregar boardActivities:', err);
           return [];
         }),
         collaboratorsAPI.getAll().catch(err => {
-          console.error('Erro ao carregar collaborators:', err);
+          console.warn('Aviso ao carregar collaborators:', err);
           return [];
         }),
         okrsAPI.getAll().catch(err => {
-          console.error('Erro ao carregar okrs:', err);
+          console.warn('Aviso ao carregar okrs:', err);
           return [];
         }),
         ritualsAPI.getAll().catch(err => {
-          console.error('Erro ao carregar rituals:', err);
+          console.warn('Aviso ao carregar rituals:', err);
           return [];
         }),
         projectsAPI.getAll().catch(err => {
-          console.error('Erro ao carregar projects:', err);
+          console.warn('Aviso ao carregar projects:', err);
           return [];
         }),
         projectAllocationsAPI.getAll().catch(err => {
-          console.error('Erro ao carregar project_allocations:', err);
+          console.warn('Aviso ao carregar project_allocations:', err);
           return [];
         }),
       ]);
@@ -454,6 +587,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         projectAllocations: finalProjectAllocations.length > 0 ? (finalProjectAllocations[0]?.id ? finalProjectAllocations.map(convertFromSupabase.projectAllocation) : finalProjectAllocations) : [],
         isLoading: false,
       });
+
+      // Inicia Realtime mesmo que o teste de SELECT falhe (pode haver política de SELECT mais restrita)
+      setupRealtime(get, set as any);
 
       // Salvaguarda: se ainda ficou vazio (ex: Supabase vazio e sem merge), tenta localStorage cru
       if (mergedCollaborators.length === 0) {

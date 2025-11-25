@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../../lib/store-supabase';
+import { saveToStorage, STORAGE_KEYS } from '../../lib/data-sync';
 
 export default function DataLoader({ children }: { children: React.ReactNode }) {
   const loadAllData = useAppStore(s => s.loadAllData);
@@ -12,6 +13,27 @@ export default function DataLoader({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const loadData = async () => {
+      // Migração de storage legado -> novo formato por entidade
+      try {
+        const legacy = localStorage.getItem('caaqui-projectops-data');
+        if (legacy) {
+          const parsed = JSON.parse(legacy);
+          const boardActivities = parsed?.boardActivities ?? [];
+          const collaborators = parsed?.collaborators ?? [];
+          const okrs = parsed?.okrs ?? [];
+          const rituals = parsed?.rituals ?? [];
+          if (boardActivities.length > 0) saveToStorage(STORAGE_KEYS.BOARD_ACTIVITIES, boardActivities);
+          if (collaborators.length > 0) saveToStorage(STORAGE_KEYS.COLLABORATORS, collaborators);
+          if (okrs.length > 0) saveToStorage(STORAGE_KEYS.OKRS, okrs);
+          if (rituals.length > 0) saveToStorage(STORAGE_KEYS.RITUALS, rituals);
+          localStorage.removeItem('caaqui-projectops-data');
+          // Nota: projects e allocations já usam chaves próprias em outras rotas
+          console.log('✅ Migração de storage legado concluída');
+        }
+      } catch (e) {
+        console.warn('Falha na migração do storage legado:', e);
+      }
+      
       // Timeout de segurança: se demorar demais, usa fallback local
       const TIMEOUT_MS = 8000;
       const timeoutId = setTimeout(() => {

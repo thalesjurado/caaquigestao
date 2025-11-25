@@ -1,7 +1,20 @@
 [build]
-  command = "npm ci && npm run build && node scripts/prepare-static.js"
+  command = "npm run build && npm run export && npm run prepare-static"
   publish = "dist-static"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "18"
-  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  NPM_VERSION = "9"
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
