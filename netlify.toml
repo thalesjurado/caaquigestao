@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build && npm run export && npm run prepare-static"
+  command = "npm run build && npm run prepare-static"
   publish = "dist-static"
 
 [[plugins]]
