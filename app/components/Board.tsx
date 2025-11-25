@@ -164,7 +164,13 @@ export default function Board() {
       done: [],
       historical: [],
     };
-    for (const a of filteredActivities) map[a.status].push(a);
+    for (const a of filteredActivities) {
+      const status: BoardActivity['status'] = a.status || 'backlog';
+      if (!map[status]) {
+        map[status] = [];
+      }
+      map[status].push(a);
+    }
     return map;
   }, [filteredActivities]);
 
