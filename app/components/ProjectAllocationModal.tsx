@@ -62,6 +62,10 @@ export default function ProjectAllocationModal({ projectId, onClose }: ProjectAl
       collaboratorId: selectedCollaboratorId,
       percentage,
       role,
+      // Por enquanto usamos um tipo padrão de hora; futuramente podemos expor na UI
+      hourType: 'billable' as const,
+      // plannedHoursMonthly pode ser calculado depois a partir de capacidade; deixamos indefinido aqui
+      plannedHoursMonthly: undefined,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
     };
