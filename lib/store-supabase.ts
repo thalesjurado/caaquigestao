@@ -1652,6 +1652,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             collaboratorId: allocation.collaboratorId,
             percentage: allocation.percentage,
             role: allocation.role,
+            hourType: allocation.hourType ?? 'billable',
+            plannedHoursMonthly: allocation.plannedHoursMonthly,
             startDate: duplicatedProject.startDate,
             endDate: duplicatedProject.endDate,
           };
