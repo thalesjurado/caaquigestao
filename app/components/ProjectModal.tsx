@@ -221,8 +221,12 @@ export default function ProjectModal({ isOpen, onClose, editingProject, onSucces
             collaboratorId: allocation.collaboratorId,
             percentage: allocation.percentage,
             role: allocation.role || '',
+            // Por enquanto consideramos toda alocação criada pelo modal de projeto como faturável
+            hourType: 'billable',
+            // Podemos deixar plannedHoursMonthly indefinido até ter uma lógica de capacidade mensal
+            plannedHoursMonthly: undefined,
             startDate: new Date(formData.startDate),
-            endDate: new Date(formData.endDate)
+            endDate: new Date(formData.endDate),
           });
         }
       }
