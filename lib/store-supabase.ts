@@ -8,6 +8,8 @@ import {
   ritualsAPI,
   projectsAPI,
   projectAllocationsAPI,
+  sprintsAPI,
+  sprintEntriesAPI,
   testConnection,
   supabase,
   SupabaseBoardActivity,
@@ -15,10 +17,13 @@ import {
   SupabaseOKR,
   SupabaseRitual,
   SupabaseProject,
-  SupabaseProjectAllocation
+  SupabaseProjectAllocation,
+  SupabaseSprint,
+  SupabaseSprintEntry
 } from './supabase';
-import { Project, ProjectAllocation, TeamAvailability, ProjectMetrics } from './types';
+import { Project, ProjectAllocation, TeamAvailability, ProjectMetrics, Sprint, SprintEntry } from './types';
 import { saveToStorage, loadFromStorage, STORAGE_KEYS, setupStorageSync } from './data-sync';
+import { notificationService } from './notifications';
 
 // Tipos locais (mantendo compatibilidade)
 export interface BoardActivity {
@@ -136,8 +141,39 @@ const convertFromSupabase = {
     collaboratorId: item.collaborator_id,
     percentage: item.percentage,
     role: item.role,
+    hourType: (item.hour_type as any) || 'billable',
+    plannedHoursMonthly: item.planned_hours_monthly ?? undefined,
     startDate: new Date(item.start_date),
     endDate: new Date(item.end_date),
+  }),
+
+  sprint: (item: SupabaseSprint): Sprint => ({
+    id: item.id,
+    projectId: item.project_id,
+    number: item.number,
+    name: item.name ?? undefined,
+    startDate: new Date(item.start_date),
+    endDate: new Date(item.end_date),
+    objective: item.objective ?? undefined,
+    status: item.status,
+    plannedHoursBillable: item.planned_hours_billable ?? undefined,
+    plannedHoursNonBillable: item.planned_hours_non_billable ?? undefined,
+    plannedHoursProduct: item.planned_hours_product ?? undefined,
+    retrospective: item.retrospective ?? undefined,
+  }),
+
+  sprintEntry: (item: SupabaseSprintEntry): SprintEntry => ({
+    id: item.id,
+    sprintId: item.sprint_id,
+    projectId: item.project_id,
+    collaboratorId: item.collaborator_id ?? undefined,
+    title: item.title,
+    status: item.status,
+    plannedHours: item.planned_hours ?? undefined,
+    spentHours: item.spent_hours ?? undefined,
+    reason: item.reason ?? undefined,
+    createdAt: item.created_at ? new Date(item.created_at) : undefined,
+    updatedAt: item.updated_at ? new Date(item.updated_at) : undefined,
   }),
 };
 
@@ -366,8 +402,35 @@ const convertToSupabase = {
     collaborator_id: item.collaboratorId,
     percentage: item.percentage,
     role: item.role,
+    hour_type: item.hourType,
+    planned_hours_monthly: item.plannedHoursMonthly,
     start_date: item.startDate?.toISOString(),
     end_date: item.endDate?.toISOString(),
+  }),
+
+  sprint: (item: Partial<Sprint>): Partial<SupabaseSprint> => ({
+    project_id: item.projectId,
+    number: item.number,
+    name: item.name,
+    start_date: item.startDate?.toISOString(),
+    end_date: item.endDate?.toISOString(),
+    objective: item.objective,
+    status: item.status,
+    planned_hours_billable: item.plannedHoursBillable,
+    planned_hours_non_billable: item.plannedHoursNonBillable,
+    planned_hours_product: item.plannedHoursProduct,
+    retrospective: item.retrospective,
+  }),
+
+  sprintEntry: (item: Partial<SprintEntry>): Partial<SupabaseSprintEntry> => ({
+    sprint_id: item.sprintId,
+    project_id: item.projectId,
+    collaborator_id: item.collaboratorId,
+    title: item.title,
+    status: item.status,
+    planned_hours: item.plannedHours,
+    spent_hours: item.spentHours,
+    reason: item.reason,
   }),
 };
 
@@ -378,6 +441,8 @@ interface AppState {
   rituals: Ritual[];
   projects: Project[];
   projectAllocations: ProjectAllocation[];
+  sprints: Sprint[];
+  sprintEntries: SprintEntry[];
   isLoading: boolean;
   error: string | null;
 }
@@ -432,6 +497,16 @@ interface AppActions {
   updateProjectAllocation: (id: string, patch: Partial<ProjectAllocation>) => Promise<void>;
   deleteProjectAllocation: (id: string) => Promise<void>;
   
+  // Sprints
+  addSprint: (sprint: Omit<Sprint, 'id'>) => Promise<void>;
+  updateSprint: (id: string, patch: Partial<Sprint>) => Promise<void>;
+  deleteSprint: (id: string) => Promise<void>;
+
+  // Sprint Entries
+  addSprintEntry: (entry: Omit<SprintEntry, 'id'>) => Promise<void>;
+  updateSprintEntry: (id: string, patch: Partial<SprintEntry>) => Promise<void>;
+  deleteSprintEntry: (id: string) => Promise<void>;
+  
   // Utility functions
   getTeamAvailability: () => TeamAvailability[];
   getProjectMetrics: () => ProjectMetrics[];
@@ -461,6 +536,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   rituals: [],
   projects: [],
   projectAllocations: [],
+  sprints: [],
+  sprintEntries: [],
   isLoading: false,
   error: null,
 
@@ -622,6 +699,14 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         projectAllocations: finalProjectAllocations.length > 0 ? (finalProjectAllocations[0]?.id ? finalProjectAllocations.map(convertFromSupabase.projectAllocation) : finalProjectAllocations) : [],
         isLoading: false,
       });
+
+      // Executar verificações de notificação após carregar dados
+      const currentState = get();
+      notificationService.runChecks(
+        currentState.projects,
+        currentState.collaborators,
+        currentState.projectAllocations
+      );
 
       // Inicia Realtime mesmo que o teste de SELECT falhe (pode haver política de SELECT mais restrita)
       setupRealtime(get, set as any);
@@ -1228,6 +1313,136 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     } catch (error) {
       console.error('Erro ao deletar alocação:', error);
       set({ error: 'Erro ao deletar alocação' });
+    }
+  },
+
+  // Sprints
+  addSprint: async (sprint) => {
+    try {
+      const localSprint: Sprint = {
+        id: uid(),
+        ...sprint,
+      };
+
+      // Otimista: adiciona no estado
+      set((state) => ({ sprints: [...state.sprints, localSprint] }));
+
+      try {
+        const toSupabase = convertToSupabase.sprint(localSprint) as Omit<SupabaseSprint, 'created_at' | 'updated_at'>;
+        const created = await sprintsAPI.create(toSupabase);
+        const converted = convertFromSupabase.sprint(created);
+        set((state) => ({
+          sprints: state.sprints.map(s => s.id === localSprint.id ? converted : s),
+        }));
+      } catch (err) {
+        console.warn('⚠️ Erro ao criar sprint no Supabase, mantendo apenas no estado local', err);
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar sprint:', error);
+      set({ error: 'Erro ao adicionar sprint' });
+    }
+  },
+
+  updateSprint: async (id, patch) => {
+    try {
+      try {
+        const toSupabase = convertToSupabase.sprint(patch);
+        const updated = await sprintsAPI.update(id, toSupabase as Partial<SupabaseSprint>);
+        const converted = convertFromSupabase.sprint(updated);
+        set((state) => ({
+          sprints: state.sprints.map(s => s.id === id ? { ...s, ...converted } : s),
+        }));
+      } catch (err) {
+        console.warn('⚠️ Erro ao atualizar sprint no Supabase, atualizando apenas localmente', err);
+        set((state) => ({
+          sprints: state.sprints.map(s => s.id === id ? { ...s, ...patch } : s),
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar sprint:', error);
+      set({ error: 'Erro ao atualizar sprint' });
+    }
+  },
+
+  deleteSprint: async (id) => {
+    try {
+      try {
+        await sprintsAPI.delete(id);
+      } catch (err) {
+        console.warn('⚠️ Erro ao deletar sprint no Supabase, removendo apenas localmente', err);
+      }
+
+      set((state) => ({
+        sprints: state.sprints.filter(s => s.id !== id),
+        sprintEntries: state.sprintEntries.filter(e => e.sprintId !== id),
+      }));
+    } catch (error) {
+      console.error('Erro ao deletar sprint:', error);
+      set({ error: 'Erro ao deletar sprint' });
+    }
+  },
+
+  // Sprint Entries
+  addSprintEntry: async (entry) => {
+    try {
+      const localEntry: SprintEntry = {
+        id: uid(),
+        ...entry,
+      };
+
+      set((state) => ({ sprintEntries: [...state.sprintEntries, localEntry] }));
+
+      try {
+        const toSupabase = convertToSupabase.sprintEntry(localEntry) as Omit<SupabaseSprintEntry, 'created_at' | 'updated_at'>;
+        const created = await sprintEntriesAPI.create(toSupabase);
+        const converted = convertFromSupabase.sprintEntry(created);
+        set((state) => ({
+          sprintEntries: state.sprintEntries.map(e => e.id === localEntry.id ? converted : e),
+        }));
+      } catch (err) {
+        console.warn('⚠️ Erro ao criar sprint entry no Supabase, mantendo apenas no estado local', err);
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar sprint entry:', error);
+      set({ error: 'Erro ao adicionar sprint entry' });
+    }
+  },
+
+  updateSprintEntry: async (id, patch) => {
+    try {
+      try {
+        const toSupabase = convertToSupabase.sprintEntry(patch);
+        const updated = await sprintEntriesAPI.update(id, toSupabase as Partial<SupabaseSprintEntry>);
+        const converted = convertFromSupabase.sprintEntry(updated);
+        set((state) => ({
+          sprintEntries: state.sprintEntries.map(e => e.id === id ? { ...e, ...converted } : e),
+        }));
+      } catch (err) {
+        console.warn('⚠️ Erro ao atualizar sprint entry no Supabase, atualizando apenas localmente', err);
+        set((state) => ({
+          sprintEntries: state.sprintEntries.map(e => e.id === id ? { ...e, ...patch } : e),
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar sprint entry:', error);
+      set({ error: 'Erro ao atualizar sprint entry' });
+    }
+  },
+
+  deleteSprintEntry: async (id) => {
+    try {
+      try {
+        await sprintEntriesAPI.delete(id);
+      } catch (err) {
+        console.warn('⚠️ Erro ao deletar sprint entry no Supabase, removendo apenas localmente', err);
+      }
+
+      set((state) => ({
+        sprintEntries: state.sprintEntries.filter(e => e.id !== id),
+      }));
+    } catch (error) {
+      console.error('Erro ao deletar sprint entry:', error);
+      set({ error: 'Erro ao deletar sprint entry' });
     }
   },
 

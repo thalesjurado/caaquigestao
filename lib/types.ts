@@ -38,6 +38,10 @@ export interface ProjectAllocation {
   collaboratorId: string;
   percentage: number; // 0-100, quanto % da pessoa está alocada
   role: string; // função específica no projeto
+  // Tipo de hora para DevOps: faturável, não faturável ou produto interno
+  hourType: 'billable' | 'non_billable' | 'product';
+  // Horas previstas por mês para esta alocação
+  plannedHoursMonthly?: number;
   startDate: Date;
   endDate: Date;
 }
@@ -117,4 +121,34 @@ export interface ProjectMetrics {
   totalAllocation: number;
   realCost: number;
   budgetVariance: number;
+}
+
+// Tipos para Sprints DevOps
+export interface Sprint {
+  id: string;
+  projectId: string;
+  number: number;
+  name?: string;
+  startDate: Date;
+  endDate: Date;
+  objective?: string;
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
+  plannedHoursBillable?: number;
+  plannedHoursNonBillable?: number;
+  plannedHoursProduct?: number;
+  retrospective?: string;
+}
+
+export interface SprintEntry {
+  id: string;
+  sprintId: string;
+  projectId: string;
+  collaboratorId?: string;
+  title: string;
+  status: 'backlog' | 'in_sprint' | 'done' | 'moved_backlog';
+  plannedHours?: number;
+  spentHours?: number;
+  reason?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

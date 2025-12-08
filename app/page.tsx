@@ -14,8 +14,12 @@ const Rituais = dynamic(() => import('./components/Rituais'), { ssr: false });
 const Team = dynamic(() => import('./components/Team'), { ssr: false });
 const TeamAvailability = dynamic(() => import('./components/TeamAvailability'), { ssr: false });
 const ProjectTimeline = dynamic(() => import('./components/ProjectTimeline'), { ssr: false });
+const ApprovalCenter = dynamic(() => import('./components/ApprovalCenter'), { ssr: false });
+const ReportCenter = dynamic(() => import('./components/ReportCenter'), { ssr: false });
+const TimeTrackingCenter = dynamic(() => import('./components/TimeTrackingCenter'), { ssr: false });
+const DeOps = dynamic(() => import('./components/DeOps'), { ssr: false });
 
-type Tab = 'dashboard' | 'projects' | 'board' | 'team' | 'availability' | 'timeline' | 'okrs' | 'rituais';
+type Tab = 'dashboard' | 'projects' | 'board' | 'team' | 'availability' | 'timeline' | 'okrs' | 'rituais' | 'approvals' | 'reports' | 'timetracking' | 'deops';
 
 export default function Page() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -24,7 +28,7 @@ export default function Page() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1) as Tab;
-      if (hash && ['dashboard', 'projects', 'board', 'team', 'availability', 'timeline', 'okrs', 'rituais'].includes(hash)) {
+      if (hash && ['dashboard', 'projects', 'board', 'team', 'availability', 'timeline', 'okrs', 'rituais', 'approvals', 'reports', 'timetracking', 'deops'].includes(hash)) {
         setTab(hash);
       }
     };
@@ -66,9 +70,13 @@ export default function Page() {
             <TabBtn id="board" label="📋 Board" />
             <TabBtn id="availability" label="👥 Disponibilidade" />
             <TabBtn id="timeline" label="📅 Timeline" />
+            <TabBtn id="approvals" label="✅ Aprovações" />
+            <TabBtn id="reports" label="📊 Relatórios" />
+            <TabBtn id="timetracking" label="⏱️ Time Tracking" />
             <TabBtn id="okrs" label="🎯 OKRs" />
             <TabBtn id="rituais" label="⚡ Rituais" />
             <TabBtn id="team" label="👨‍💼 Equipe" />
+            <TabBtn id="deops" label="⚙️ DeOps" />
           </div>
         </section>
 
@@ -120,10 +128,34 @@ export default function Page() {
           </>
         )}
 
+        {tab === 'approvals' && (
+          <>
+            <ApprovalCenter />
+          </>
+        )}
+
+        {tab === 'reports' && (
+          <>
+            <ReportCenter />
+          </>
+        )}
+
+        {tab === 'timetracking' && (
+          <>
+            <TimeTrackingCenter />
+          </>
+        )}
+
         {tab === 'team' && (
           <>
             <h2 className="text-2xl font-bold mb-3">Equipe</h2>
             <Team />
+          </>
+        )}
+
+        {tab === 'deops' && (
+          <>
+            <DeOps />
           </>
         )}
         </section>

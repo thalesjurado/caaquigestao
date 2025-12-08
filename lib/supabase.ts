@@ -119,8 +119,41 @@ export interface SupabaseProjectAllocation {
   collaborator_id: string
   percentage: number
   role: string
+  hour_type?: 'billable' | 'non_billable' | 'product'
+  planned_hours_monthly?: number
   start_date: string
   end_date: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SupabaseSprint {
+  id: string
+  project_id: string
+  number: number
+  name?: string
+  start_date: string
+  end_date: string
+  objective?: string
+  status: 'planned' | 'active' | 'completed' | 'cancelled'
+  planned_hours_billable?: number
+  planned_hours_non_billable?: number
+  planned_hours_product?: number
+  retrospective?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SupabaseSprintEntry {
+  id: string
+  sprint_id: string
+  project_id: string
+  collaborator_id?: string
+  title: string
+  status: 'backlog' | 'in_sprint' | 'done' | 'moved_backlog'
+  planned_hours?: number
+  spent_hours?: number
+  reason?: string
   created_at?: string
   updated_at?: string
 }
@@ -185,6 +218,113 @@ export const boardActivitiesAPI = {
     if (error) throw error
   }
 }
+
+// Funções para Sprints
+export const sprintsAPI = {
+  async getAll() {
+    if (!hasValidKey) return [] as any[];
+    const { data, error } = await supabase
+      .from('sprints')
+      .select('*')
+      .order('start_date', { ascending: false });
+
+    if (error) {
+      console.warn('⚠️ Erro detalhado sprints:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async getByProject(projectId: string) {
+    const { data, error } = await supabase
+      .from('sprints')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('number', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(sprint: Omit<SupabaseSprint, 'created_at' | 'updated_at'>) {
+    const { data, error } = await supabase
+      .from('sprints')
+      .insert([{ ...sprint, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<SupabaseSprint>) {
+    const { data, error } = await supabase
+      .from('sprints')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('sprints')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+};
+
+// Funções para Sprint Entries
+export const sprintEntriesAPI = {
+  async getBySprint(sprintId: string) {
+    if (!hasValidKey) return [] as any[];
+    const { data, error } = await supabase
+      .from('sprint_entries')
+      .select('*')
+      .eq('sprint_id', sprintId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(entry: Omit<SupabaseSprintEntry, 'created_at' | 'updated_at'>) {
+    const { data, error } = await supabase
+      .from('sprint_entries')
+      .insert([{ ...entry, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id: string, updates: Partial<SupabaseSprintEntry>) {
+    const { data, error } = await supabase
+      .from('sprint_entries')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('sprint_entries')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+};
 
 // Funções para Collaborators
 export const collaboratorsAPI = {

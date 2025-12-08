@@ -2,9 +2,6 @@
   command = "npm run build && npm run prepare-static"
   publish = "dist-static"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"

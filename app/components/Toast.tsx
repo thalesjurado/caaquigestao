@@ -6,8 +6,9 @@ function ToastItem({ toast }: { toast: ToastType }) {
   const bgColor = {
     success: 'bg-green-500',
     error: 'bg-red-500',
-    info: 'bg-blue-500'
-  }[toast.type];
+    info: 'bg-blue-500',
+    warning: 'bg-yellow-500'
+  }[toast.type] || 'bg-gray-500';
 
   return (
     <div className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between min-w-80 animate-slide-in`}>

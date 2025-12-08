@@ -207,7 +207,7 @@
     "nanoid": "^3.3.11",
     "napi-postinstall": "^0.3.3",
     "natural-compare": "^1.4.0",
-    "next": "^15.4.7",
+    "next": "^15.5.7",
     "object-assign": "^4.1.1",
     "object-inspect": "^1.13.4",
     "object-keys": "^1.1.1",

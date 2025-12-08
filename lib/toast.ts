@@ -4,7 +4,7 @@ import { useSyncExternalStore } from 'react';
 export type Toast = {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
   duration?: number;
 };
 
@@ -50,9 +50,13 @@ export function useToasts() {
   return useSyncExternalStore(subscribe, () => toasts, () => toasts);
 }
 
-// Helper functions
+// Toast API
 export const toast = {
   success: (message: string) => addToast(message, 'success'),
   error: (message: string) => addToast(message, 'error'),
+  warning: (message: string) => addToast(message, 'warning'),
   info: (message: string) => addToast(message, 'info')
 };
+
+// Alias for compatibility
+export const showToast = addToast;
